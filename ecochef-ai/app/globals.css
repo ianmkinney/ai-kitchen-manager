@@ -19,17 +19,25 @@
   }
 
   .btn-primary {
-    @apply px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 
-           transition-colors duration-200 font-medium;
+    @apply px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-white text-primary-500 border border-primary-500 
-           rounded-lg hover:bg-primary-50 transition-colors duration-200 font-medium;
+    @apply px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-800 transition-colors;
   }
 
   .input-field {
     @apply w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 
            focus:ring-primary-500 focus:border-transparent outline-none;
   }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 } 

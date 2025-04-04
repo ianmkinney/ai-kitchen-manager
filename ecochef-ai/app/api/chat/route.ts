@@ -43,6 +43,8 @@ export async function POST(request: Request) {
     const { message } = body;
     const preferences = body.preferences || {};
 
+    console.log('Chat API received request with preferences:', preferences);
+
     if (!message) {
       return NextResponse.json(
         { error: 'Message is required' },
@@ -50,9 +52,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create a promise with a timeout
+    // Create a enhanced message with detailed preferences
+    const enhancedMessage = `
+      Based on the following dietary preferences:
+      - ${preferences.isVegetarian ? 'Is Vegetarian' : 'Not Vegetarian'}
+      - ${preferences.isVegan ? 'Is Vegan' : 'Not Vegan'}
+      - ${preferences.isGlutenFree ? 'Needs Gluten-Free options' : 'Can eat gluten'}
+      - ${preferences.isDairyFree ? 'Needs Dairy-Free options' : 'Can consume dairy'}
+      - Maximum cooking time: ${preferences.maxCookingTime || 60} minutes
+      
+      ${message}
+      
+      Give 3 specific meal suggestions with brief cooking instructions, and a few nutrition tips.
+    `;
+
+    // Create a promise with a timeout - increase from 5000 to 15000
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Request timeout")), 5000);
+      setTimeout(() => reject(new Error("Request timeout")), 15000); // Increase to 15 seconds
     });
 
     // Try to get a response from the API with a timeout
@@ -62,7 +78,7 @@ export async function POST(request: Request) {
         max_tokens: 1000,
         system: "You are a helpful AI assistant focused on nutrition and cooking advice. Provide personalized meal suggestions and tips based on dietary preferences.",
         messages: [
-          { role: 'user', content: message }
+          { role: 'user', content: enhancedMessage }
         ],
       });
       

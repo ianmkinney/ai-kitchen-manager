@@ -31,10 +31,10 @@ export default function QuizResults() {
           const data = await response.json();
           setPreferences(data.preferences);
           
-          // Get AI suggestions based on preferences
-          if (data.preferences) {
-            getAiSuggestions(data.preferences);
-          }
+          // Remove automatic API call on load
+          // if (data.preferences) {
+          //   getAiSuggestions(data.preferences);
+          // }
         }
       } catch (error) {
         console.error('Error fetching preferences:', error);
@@ -50,6 +50,9 @@ export default function QuizResults() {
     try {
       setAiLoading(true);
       setAiError(null);
+      setAiSuggestions(''); // Clear previous suggestions
+      
+      console.log('Requesting AI suggestions with preferences:', preferences);
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -57,16 +60,18 @@ export default function QuizResults() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: `Based on these dietary preferences: ${JSON.stringify(preferences)}, 
-            suggest 3 healthy meal options and some general nutrition advice.`
+          message: `Based on these dietary preferences, suggest 3 healthy meal options and some general nutrition advice.`,
+          preferences: preferences // Explicitly pass preferences as a separate property
         }),
         signal: AbortSignal.timeout(30000), // 30 seconds timeout
       });
       
       if (response.ok) {
         const data = await response.json();
+        console.log('AI response received:', data);
         setAiSuggestions(data.response);
       } else {
+        console.error('API returned error status:', response.status);
         setAiError('Failed to get meal suggestions. Please try again.');
       }
     } catch (error) {
@@ -124,12 +129,23 @@ export default function QuizResults() {
         </section>
 
         <section className="card">
-          <h2 className="text-xl font-semibold mb-4">AI Recommendations</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">AI Recommendations</h2>
+            {preferences && !aiLoading && (
+              <button 
+                onClick={() => getAiSuggestions(preferences)}
+                className="btn-secondary text-sm px-3 py-1"
+              >
+                Get New Ideas
+              </button>
+            )}
+          </div>
+          
           <div className="prose">
             {aiLoading ? (
-              <div className="flex flex-col items-center space-y-2">
+              <div className="flex flex-col items-center space-y-4 py-6">
                 <p>Generating personalized recommendations...</p>
-                <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
             ) : aiError ? (
               <div className="text-red-500">
@@ -144,7 +160,7 @@ export default function QuizResults() {
             ) : aiSuggestions ? (
               <div dangerouslySetInnerHTML={{ __html: aiSuggestions.replace(/\n/g, '<br>') }} />
             ) : (
-              <p>Loading personalized recommendations...</p>
+              <p className="text-center italic">Click "Get New Ideas" to generate meal suggestions</p>
             )}
           </div>
         </section>
