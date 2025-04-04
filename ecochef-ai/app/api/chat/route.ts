@@ -124,10 +124,18 @@ export async function POST(request: Request) {
       throw error;
     }
   } catch (error) {
-    // Improved error logging
+    // Improved error logging with proper type checking
     console.error('Error in chat API:', error);
+    
+    // Get error details with proper type checking
+    let errorMessage = 'Unknown error';
+    if (error && typeof error === 'object' && 'message' in error && 
+        typeof error.message === 'string') {
+      errorMessage = error.message;
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to get AI response', details: error.message || 'Unknown error' },
+      { error: 'Failed to get AI response', details: errorMessage },
       { status: 500 }
     );
   }
