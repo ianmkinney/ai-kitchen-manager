@@ -136,7 +136,15 @@ export default function MealPlanning() {
       setAiResponse(data.response || 'No suggestions available');
     } catch (error) {
       console.error('Error fetching meal suggestions:', error);
-      setAiResponse(`Sorry, there was an error getting meal suggestions: ${error.message}. Please try again.`);
+      
+      // Extract error message with proper type checking
+      let errorMessage = 'Unknown error';
+      if (error && typeof error === 'object' && 'message' in error && 
+          typeof error.message === 'string') {
+        errorMessage = error.message;
+      }
+      
+      setAiResponse(`Sorry, there was an error getting meal suggestions: ${errorMessage}. Please try again.`);
     } finally {
       setIsLoading(false);
     }
