@@ -50,9 +50,15 @@ export default function DietaryQuiz() {
 
   const handleMultipleChoice = (questionId: string, value: string) => {
     const currentValues = answers[questionId] || [];
-    const updatedValues = currentValues.includes(value)
-      ? currentValues.filter((v: string) => v !== value)
-      : [...currentValues, value];
+    
+    // Convert string to array if needed
+    const valuesArray = Array.isArray(currentValues) 
+      ? currentValues 
+      : currentValues ? [currentValues] : [];
+    
+    const updatedValues = valuesArray.includes(value)
+      ? valuesArray.filter(v => v !== value)
+      : [...valuesArray, value];
     
     handleAnswer(questionId, updatedValues);
   };
