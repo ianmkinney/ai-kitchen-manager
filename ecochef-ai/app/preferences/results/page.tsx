@@ -160,7 +160,7 @@ export default function QuizResults() {
             ) : aiSuggestions ? (
               <div dangerouslySetInnerHTML={{ __html: aiSuggestions.replace(/\n/g, '<br>') }} />
             ) : (
-              <p className="text-center italic">Click "Get New Ideas" to generate meal suggestions</p>
+              <p className="text-center italic">Click &quot;Get New Ideas&quot; to generate meal suggestions</p>
             )}
           </div>
         </section>

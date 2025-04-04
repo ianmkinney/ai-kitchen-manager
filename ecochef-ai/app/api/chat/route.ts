@@ -14,7 +14,7 @@ const getFallbackSuggestions = (preferences: unknown) => {
   // Check dietary restrictions and return appropriate fallback suggestions
   const isVegetarian = preferences.isVegetarian;
   const isVegan = preferences.isVegan;
-  const isGlutenFree = preferences.isGlutenFree;
+  const _isGlutenFree = preferences.isGlutenFree;
   
   let suggestions = "Here are some meal suggestions based on your preferences:\n\n";
   
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ response: responseText });
-    } catch (timeoutError) {
+    } catch (_timeoutError) {
       // If timeout happens, use fallback
       console.log('AI response timed out, using fallback suggestions');
       return NextResponse.json({ 
