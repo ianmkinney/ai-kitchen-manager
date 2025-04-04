@@ -105,7 +105,8 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ response: responseText });
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // Type guard to check if error is an object with a name property
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
         // Handle timeout
         console.log('AI response timed out, using fallback suggestions');
         return NextResponse.json({ 
