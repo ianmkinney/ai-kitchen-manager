@@ -1,6 +1,42 @@
+"use client";
+
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function MealPlanning() {
+  const [query, setQuery] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleGetMealIdeas = async () => {
+    if (!query.trim()) return;
+    
+    setIsLoading(true);
+    setAiResponse('');
+    
+    try {
+      const response = await fetch('/api/meal-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get meal suggestions');
+      }
+      
+      const data = await response.json();
+      setAiResponse(data.suggestions);
+    } catch (error) {
+      console.error('Error fetching meal suggestions:', error);
+      setAiResponse('Sorry, there was an error getting meal suggestions. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -51,16 +87,38 @@ export default function MealPlanning() {
                 type="text"
                 placeholder="Ask for meal suggestions..."
                 className="input-field"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleGetMealIdeas();
+                  }
+                }}
               />
-              <button className="btn-primary whitespace-nowrap">
-                Get Ideas
+              <button 
+                className="btn-primary whitespace-nowrap"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleGetMealIdeas();
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Loading...' : 'Get Ideas'}
               </button>
             </div>
-            <div className="h-64 bg-gray-50 rounded-lg p-4">
-              {/* AI responses will go here */}
-              <p className="text-gray-500 text-center mt-20">
-                Ask AI for personalized meal suggestions!
-              </p>
+            <div className="h-64 bg-gray-50 rounded-lg p-4 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                </div>
+              ) : aiResponse ? (
+                <div className="whitespace-pre-line">{aiResponse}</div>
+              ) : (
+                <p className="text-gray-500 text-center mt-20">
+                  Ask AI for personalized meal suggestions!
+                </p>
+              )}
             </div>
           </div>
         </section>
