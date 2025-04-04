@@ -5,8 +5,6 @@ import { env } from '../../lib/env';
 // Initialize Anthropic client
 const anthropic = new Anthropic({
   apiKey: env.CLAUDE_API_KEY,
-  // Set a timeout for the API request
-  requestTimeout: 25000, // 25 seconds
 });
 
 // Add fallback suggestions for when the API is slow
@@ -65,13 +63,11 @@ export async function POST(request: Request) {
       Give 3 specific meal suggestions with brief cooking instructions, and a few nutrition tips.
     `;
 
-    // Create a promise with a timeout - increase from 5000 to 15000
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Request timeout")), 15000); // Increase to 15 seconds
-    });
-
     // Try to get a response from the API with a timeout
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+      
       const responsePromise = anthropic.messages.create({
         model: 'claude-3-haiku-20240307',
         max_tokens: 1000,
@@ -79,10 +75,12 @@ export async function POST(request: Request) {
         messages: [
           { role: 'user', content: enhancedMessage }
         ],
+      }, {
+        signal: controller.signal
       });
       
-      // Race between the API response and timeout
-      const response = await Promise.race([responsePromise, timeoutPromise]);
+      const response = await responsePromise;
+      clearTimeout(timeoutId);
       
       let responseText = '';
       if (response.content && Array.isArray(response.content)) {
@@ -93,13 +91,17 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({ response: responseText });
-    } catch {
-      // If timeout happens, use fallback
-      console.log('AI response timed out, using fallback suggestions');
-      return NextResponse.json({ 
-        response: getFallbackSuggestions(preferences),
-        source: 'fallback'
-      });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        // Handle timeout
+        console.log('AI response timed out, using fallback suggestions');
+        return NextResponse.json({ 
+          response: getFallbackSuggestions(preferences),
+          source: 'fallback'
+        });
+      }
+      // Handle other errors
+      throw error;
     }
   } catch (error) {
     console.error('Error in chat API:', error);
