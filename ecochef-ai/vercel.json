@@ -1,0 +1,9 @@
+{
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "NEXTAUTH_URL": "${NEXTAUTH_URL}"
+  }
+} 

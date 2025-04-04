@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Supabase doesn't need these special URLs that Vercel Postgres requires
+  // directUrl and shadowDatabaseUrl can be removed
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  preferences   UserPreferences?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model UserPreferences {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  
+  // Dietary restrictions
+  isVegetarian        Boolean  @default(false)
+  isVegan             Boolean  @default(false)
+  isGlutenFree        Boolean  @default(false)
+  isDairyFree         Boolean  @default(false)
+  isNutFree           Boolean  @default(false)
+  
+  // Flavor preferences (1-10 scale)
+  spicyPreference     Int?     @default(5)
+  sweetPreference     Int?     @default(5)
+  savoryPreference    Int?     @default(5)
+  
+  // Cooking preferences
+  maxCookingTime      Int?     // in minutes
+  cookingSkillLevel   String?  @default("intermediate") // beginner, intermediate, advanced
+  
+  // Other preferences
+  calorieTarget       Int?
+  proteinTarget       Int?
+  carbTarget          Int?
+  fatTarget           Int?
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+} 
