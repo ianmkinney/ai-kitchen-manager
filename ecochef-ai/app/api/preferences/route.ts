@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const preferencesStr = cookieStore.get('userPreferences')?.value;
     
     let preferences = null;
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     
     // In a real app, save to database
     // For now, save to cookies
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.set('userPreferences', JSON.stringify(preferences), {
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
