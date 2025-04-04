@@ -10,7 +10,7 @@ const anthropic = new Anthropic({
 });
 
 // Add fallback suggestions for when the API is slow
-const getFallbackSuggestions = (preferences: any) => {
+const getFallbackSuggestions = (preferences: unknown) => {
   // Check dietary restrictions and return appropriate fallback suggestions
   const isVegetarian = preferences.isVegetarian;
   const isVegan = preferences.isVegan;
