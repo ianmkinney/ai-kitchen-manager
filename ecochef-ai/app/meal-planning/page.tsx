@@ -58,7 +58,7 @@ export default function MealPlanning() {
   }, []);
   
   // Handle preference changes
-  const handlePreferenceChange = (e) => {
+  const handlePreferenceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type, checked } = e.target;
     
     setPreferences(prev => ({
@@ -68,7 +68,7 @@ export default function MealPlanning() {
   };
   
   // Save preferences
-  const savePreferences = async (e) => {
+  const savePreferences = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     try {
