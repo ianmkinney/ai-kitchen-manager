@@ -1,75 +1,57 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../lib/db';
 import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
-export async function POST(request: Request) {
+// In a real app, this would connect to a database
+// For now, we'll use cookies for simplicity
+
+export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
+    const cookieStore = cookies();
+    const preferencesStr = cookieStore.get('userPreferences')?.value;
     
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    let preferences = null;
+    if (preferencesStr) {
+      try {
+        preferences = JSON.parse(preferencesStr);
+      } catch (e) {
+        console.error('Error parsing preferences cookie:', e);
+      }
     }
     
-    const userId = session.user.id;
-    const body = await request.json();
-    
-    // Map quiz answers to database model
-    const preferences = {
-      isVegetarian: body.dietary?.includes('vegetarian') || false,
-      isVegan: body.dietary?.includes('vegan') || false,
-      isGlutenFree: body.dietary?.includes('gluten-free') || false,
-      isDairyFree: body.dietary?.includes('dairy-free') || false,
-      maxCookingTime: parseInt(body['cooking-time'] || '60', 10),
-      // Map other preferences as needed
-    };
-    
-    // Upsert the preferences (create or update)
-    const result = await prisma.userPreferences.upsert({
-      where: { userId },
-      update: preferences,
-      create: {
-        userId,
-        ...preferences
-      }
-    });
-    
-    return NextResponse.json({ success: true, preferences: result });
+    return NextResponse.json({ preferences }, { status: 200 });
   } catch (error) {
-    console.error('Error saving preferences:', error);
+    console.error('Error getting preferences:', error);
     return NextResponse.json(
-      { error: 'Failed to save preferences' },
+      { error: 'Failed to get preferences' },
       { status: 500 }
     );
   }
 }
 
-export async function GET() {
+export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
+    const { preferences } = await request.json();
     
-    // For demo purposes, allow access without auth
-    let userId = 'demo';
-    
-    // If authenticated, use actual user ID
-    if (session) {
-      userId = session.user.id;
+    if (!preferences) {
+      return NextResponse.json(
+        { error: 'Preferences are required' },
+        { status: 400 }
+      );
     }
     
-    const preferences = await prisma.userPreferences.findUnique({
-      where: { userId }
+    // In a real app, save to database
+    // For now, save to cookies
+    const cookieStore = cookies();
+    cookieStore.set('userPreferences', JSON.stringify(preferences), {
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
     });
     
-    return NextResponse.json({ preferences });
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching preferences:', error);
+    console.error('Error saving preferences:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch preferences' },
+      { error: 'Failed to save preferences' },
       { status: 500 }
     );
   }

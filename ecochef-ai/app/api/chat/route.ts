@@ -14,6 +14,8 @@ interface UserPreferences {
   isGlutenFree?: boolean;
   isDairyFree?: boolean;
   maxCookingTime?: number;
+  cuisine?: string;
+  peopleCount?: number;
   [key: string]: boolean | number | string | undefined;
 }
 
@@ -25,8 +27,9 @@ const getFallbackSuggestions = (preferences: unknown) => {
   // Check dietary restrictions and return appropriate fallback suggestions
   const isVegetarian = prefs.isVegetarian;
   const isVegan = prefs.isVegan;
+  const cuisine = prefs.cuisine || 'Any';
   
-  let suggestions = "Here are some meal suggestions based on your preferences:\n\n";
+  let suggestions = `Here are some meal suggestions based on your preferences (cuisine: ${cuisine}):\n\n`;
   
   if (isVegan) {
     suggestions += "1. Chickpea and vegetable curry with brown rice\n";
@@ -53,7 +56,8 @@ export async function POST(request: Request) {
     const { message } = body;
     const preferences = body.preferences || {};
 
-    console.log('Chat API received request with preferences:', preferences);
+    console.log('Chat API received request with message:', message);
+    console.log('Chat API received preferences:', preferences);
 
     if (!message) {
       return NextResponse.json(
@@ -69,6 +73,8 @@ export async function POST(request: Request) {
       - ${preferences.isVegan ? 'Is Vegan' : 'Not Vegan'}
       - ${preferences.isGlutenFree ? 'Needs Gluten-Free options' : 'Can eat gluten'}
       - ${preferences.isDairyFree ? 'Needs Dairy-Free options' : 'Can consume dairy'}
+      - Preferred cuisine: ${preferences.cuisine || 'Any'}
+      - Cooking for: ${preferences.peopleCount || 2} people
       - Maximum cooking time: ${preferences.maxCookingTime || 60} minutes
       
       ${message}
@@ -118,9 +124,10 @@ export async function POST(request: Request) {
       throw error;
     }
   } catch (error) {
+    // Improved error logging
     console.error('Error in chat API:', error);
     return NextResponse.json(
-      { error: 'Failed to get AI response' },
+      { error: 'Failed to get AI response', details: error.message || 'Unknown error' },
       { status: 500 }
     );
   }

@@ -1,13 +1,97 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface UserPreferences {
+  isVegetarian: boolean;
+  isVegan: boolean;
+  isGlutenFree: boolean;
+  isDairyFree: boolean;
+  cuisine: string;
+  peopleCount: number;
+  maxCookingTime: number;
+}
 
 export default function MealPlanning() {
+  // State for query and AI response
   const [query, setQuery] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // State for user preferences
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    isVegetarian: false,
+    isVegan: false,
+    isGlutenFree: false,
+    isDairyFree: false,
+    cuisine: 'Any',
+    peopleCount: 2,
+    maxCookingTime: 30
+  });
+  
+  // Load saved preferences on component mount
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      try {
+        const response = await fetch('/api/preferences');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.preferences) {
+            setPreferences({
+              isVegetarian: data.preferences.isVegetarian || false,
+              isVegan: data.preferences.isVegan || false,
+              isGlutenFree: data.preferences.isGlutenFree || false,
+              isDairyFree: data.preferences.isDairyFree || false,
+              cuisine: data.preferences.cuisine || 'Any',
+              peopleCount: data.preferences.peopleCount || 2,
+              maxCookingTime: data.preferences.maxCookingTime || 30
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching preferences:', error);
+      }
+    };
 
+    fetchPreferences();
+  }, []);
+  
+  // Handle preference changes
+  const handlePreferenceChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    setPreferences(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+  
+  // Save preferences
+  const savePreferences = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const response = await fetch('/api/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ preferences })
+      });
+      
+      if (response.ok) {
+        alert('Preferences saved successfully!');
+      } else {
+        alert('Failed to save preferences');
+      }
+    } catch (error) {
+      console.error('Error saving preferences:', error);
+      alert('An error occurred while saving preferences');
+    }
+  };
+
+  // Get meal ideas from Claude AI
   const handleGetMealIdeas = async () => {
     if (!query.trim()) return;
     
@@ -15,23 +99,42 @@ export default function MealPlanning() {
     setAiResponse('');
     
     try {
-      const response = await fetch('/api/meal-suggestions', {
+      console.log('Sending request with query:', query);
+      console.log('Sending preferences:', preferences);
+      
+      // Call the chat API with preferences and query
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ 
+          message: query,
+          preferences: preferences
+        }),
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to get meal suggestions');
+      // Read the response as text first to debug
+      const responseText = await response.text();
+      console.log('Raw API response:', responseText);
+      
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error('Invalid response format from server');
       }
       
-      const data = await response.json();
-      setAiResponse(data.suggestions);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get meal suggestions');
+      }
+      
+      setAiResponse(data.response || 'No suggestions available');
     } catch (error) {
       console.error('Error fetching meal suggestions:', error);
-      setAiResponse('Sorry, there was an error getting meal suggestions. Please try again.');
+      setAiResponse(`Sorry, there was an error getting meal suggestions: ${error.message}. Please try again.`);
     } finally {
       setIsLoading(false);
     }
@@ -50,30 +153,112 @@ export default function MealPlanning() {
         {/* Preferences Section */}
         <section className="card">
           <h2 className="text-xl font-semibold mb-4">Your Preferences</h2>
-          <form className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Dietary Restrictions
-              </label>
-              <select className="input-field">
-                <option>None</option>
-                <option>Vegetarian</option>
-                <option>Vegan</option>
-                <option>Gluten-Free</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Cooking Time Preference
-              </label>
-              <select className="input-field">
-                <option>Quick (15-30 mins)</option>
-                <option>Medium (30-60 mins)</option>
-                <option>Any duration</option>
-              </select>
+          <form className="space-y-4" onSubmit={savePreferences}>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">
+                  Dietary Restrictions
+                </label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="isVegetarian"
+                      checked={preferences.isVegetarian}
+                      onChange={handlePreferenceChange}
+                      className="mr-2"
+                    />
+                    Vegetarian
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="isVegan"
+                      checked={preferences.isVegan}
+                      onChange={handlePreferenceChange}
+                      className="mr-2"
+                    />
+                    Vegan
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="isGlutenFree"
+                      checked={preferences.isGlutenFree}
+                      onChange={handlePreferenceChange}
+                      className="mr-2"
+                    />
+                    Gluten-Free
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="isDairyFree"
+                      checked={preferences.isDairyFree}
+                      onChange={handlePreferenceChange}
+                      className="mr-2"
+                    />
+                    Dairy-Free
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Cooking Time (minutes)
+                </label>
+                <select 
+                  name="maxCookingTime"
+                  className="input-field"
+                  value={preferences.maxCookingTime}
+                  onChange={handlePreferenceChange}
+                >
+                  <option value="15">Quick (15 mins)</option>
+                  <option value="30">Medium (30 mins)</option>
+                  <option value="60">Long (60 mins)</option>
+                  <option value="120">Any duration</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Number of People
+                </label>
+                <select 
+                  name="peopleCount"
+                  className="input-field"
+                  value={preferences.peopleCount}
+                  onChange={handlePreferenceChange}
+                >
+                  <option value="1">1 person</option>
+                  <option value="2">2 people</option>
+                  <option value="4">4 people</option>
+                  <option value="6">6+ people</option>
+                </select>
+              </div>
+              
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">
+                  Cuisine Preference
+                </label>
+                <select 
+                  name="cuisine"
+                  className="input-field"
+                  value={preferences.cuisine}
+                  onChange={handlePreferenceChange}
+                >
+                  <option value="Any">Any Cuisine</option>
+                  <option value="Italian">Italian</option>
+                  <option value="Mexican">Mexican</option>
+                  <option value="Asian">Asian</option>
+                  <option value="Mediterranean">Mediterranean</option>
+                  <option value="Indian">Indian</option>
+                  <option value="American">American</option>
+                </select>
+              </div>
             </div>
             <button type="submit" className="btn-primary w-full">
-              Update Preferences
+              Save Preferences
             </button>
           </form>
         </section>
