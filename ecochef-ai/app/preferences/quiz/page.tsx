@@ -31,12 +31,17 @@ const quizQuestions = [
   // Add more questions as needed
 ];
 
+// Define proper types
+interface QuizAnswers {
+  [key: string]: string | string[];
+}
+
 export default function DietaryQuiz() {
   const router = useRouter();
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<QuizAnswers>({});
 
-  const handleAnswer = (questionId: string, value: any) => {
+  const handleAnswer = (questionId: string, value: string | string[]) => {
     setAnswers({
       ...answers,
       [questionId]: value,
