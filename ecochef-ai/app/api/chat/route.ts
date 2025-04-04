@@ -7,11 +7,24 @@ const anthropic = new Anthropic({
   apiKey: env.CLAUDE_API_KEY,
 });
 
+// Add a proper interface for the preferences
+interface UserPreferences {
+  isVegetarian: boolean;
+  isVegan: boolean;
+  isGlutenFree?: boolean;
+  isDairyFree?: boolean;
+  maxCookingTime?: number;
+  [key: string]: any; // Allow any other properties
+}
+
 // Add fallback suggestions for when the API is slow
 const getFallbackSuggestions = (preferences: unknown) => {
+  // Type assertion to work with the preferences
+  const prefs = preferences as UserPreferences;
+  
   // Check dietary restrictions and return appropriate fallback suggestions
-  const isVegetarian = preferences.isVegetarian;
-  const isVegan = preferences.isVegan;
+  const isVegetarian = prefs.isVegetarian;
+  const isVegan = prefs.isVegan;
   
   let suggestions = "Here are some meal suggestions based on your preferences:\n\n";
   
