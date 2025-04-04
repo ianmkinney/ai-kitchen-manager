@@ -14,7 +14,7 @@ interface UserPreferences {
   isGlutenFree?: boolean;
   isDairyFree?: boolean;
   maxCookingTime?: number;
-  [key: string]: any; // Allow any other properties
+  [key: string]: boolean | number | string | undefined;
 }
 
 // Add fallback suggestions for when the API is slow
