@@ -20,6 +20,8 @@ export default function QuizResults() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPreferences = async () => {
@@ -46,6 +48,9 @@ export default function QuizResults() {
 
   const getAiSuggestions = async (preferences: UserPreferences) => {
     try {
+      setAiLoading(true);
+      setAiError(null);
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -55,14 +60,20 @@ export default function QuizResults() {
           message: `Based on these dietary preferences: ${JSON.stringify(preferences)}, 
             suggest 3 healthy meal options and some general nutrition advice.`
         }),
+        signal: AbortSignal.timeout(30000), // 30 seconds timeout
       });
       
       if (response.ok) {
         const data = await response.json();
         setAiSuggestions(data.response);
+      } else {
+        setAiError('Failed to get meal suggestions. Please try again.');
       }
     } catch (error) {
       console.error('Error getting AI suggestions:', error);
+      setAiError('Error generating meal suggestions. The request may have timed out.');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -115,7 +126,22 @@ export default function QuizResults() {
         <section className="card">
           <h2 className="text-xl font-semibold mb-4">AI Recommendations</h2>
           <div className="prose">
-            {aiSuggestions ? (
+            {aiLoading ? (
+              <div className="flex flex-col items-center space-y-2">
+                <p>Generating personalized recommendations...</p>
+                <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : aiError ? (
+              <div className="text-red-500">
+                <p>{aiError}</p>
+                <button 
+                  onClick={() => preferences && getAiSuggestions(preferences)}
+                  className="btn-primary mt-4"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : aiSuggestions ? (
               <div dangerouslySetInnerHTML={{ __html: aiSuggestions.replace(/\n/g, '<br>') }} />
             ) : (
               <p>Loading personalized recommendations...</p>
