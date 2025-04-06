@@ -2,7 +2,6 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 
 interface Recipe {
   id: number;
@@ -23,7 +22,6 @@ export default function CookingAssistant() {
   
   // State for cooking assistant
   const [assistantMessage, setAssistantMessage] = useState('');
-  const [assistantResponse, setAssistantResponse] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [conversation, setConversation] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
 
@@ -78,7 +76,6 @@ export default function CookingAssistant() {
       
       // Add assistant response to conversation
       setConversation(prev => [...prev, { role: 'assistant', content: data.response }]);
-      setAssistantResponse(data.response);
     } catch (error) {
       console.error('Error getting cooking assistant response:', error);
       setConversation(prev => [...prev, { 

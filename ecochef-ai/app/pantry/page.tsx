@@ -168,7 +168,7 @@ export default function Pantry() {
                 <li>Run <code className="bg-gray-200 px-1 rounded">npm run supabase:manual</code> from the project root</li>
                 <li>Follow the instructions to set up the database in the Supabase SQL Editor</li>
                 <li>Make sure to use the <strong>exact SQL provided</strong> with proper column names</li>
-                <li>Column names must use camelCase with double quotes in SQL (e.g., <code className="bg-gray-200 px-1 rounded">"createdAt"</code>)</li>
+                <li>Column names must use camelCase with double quotes in SQL (e.g., <code className="bg-gray-200 px-1 rounded">&quot;createdAt&quot;</code>)</li>
               </ol>
             </div>
           ) : null}
@@ -225,7 +225,7 @@ export default function Pantry() {
         <section className="card">
           <h2 className="text-xl font-semibold mb-4">AI Shopping Assistant</h2>
           <p className="text-sm text-gray-600 mb-4">
-            Get personalized suggestions for ingredients to buy based on what's already in your pantry and your dietary preferences.
+            Get personalized suggestions for ingredients to buy based on what&apos;s already in your pantry and your dietary preferences.
           </p>
           
           <button 

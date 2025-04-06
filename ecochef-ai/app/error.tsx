@@ -53,7 +53,7 @@ export default function Error({
             <p className="font-mono text-xs whitespace-pre-wrap">{error.message}</p>
             {error.stack && (
               <pre className="mt-2 font-mono text-xs whitespace-pre-wrap overflow-x-auto">
-                {error.stack.split('\n').slice(1).join('\n')}
+                {error.stack.split("\n").slice(1).join("\n")}
               </pre>
             )}
           </div>

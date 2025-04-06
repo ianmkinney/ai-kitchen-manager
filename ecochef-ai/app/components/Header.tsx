@@ -12,7 +12,7 @@ export default function Header() {
   useEffect(() => {
     const checkUserPreferences = async () => {
       try {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('user_preferences')
           .select('id')
           .single();

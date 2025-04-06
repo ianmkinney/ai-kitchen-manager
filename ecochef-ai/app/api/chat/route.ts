@@ -30,7 +30,6 @@ const getFallbackSuggestions = (preferences: unknown, pantryItems: string[] = []
   // Check dietary restrictions and return appropriate fallback suggestions
   const isVegetarian = prefs.isVegetarian;
   const isVegan = prefs.isVegan;
-  const cuisines = Array.isArray(prefs.cuisinePreferences) ? prefs.cuisinePreferences.join(', ') : 'Any';
   
   const pantryItemsList = pantryItems.length > 0 ? `Based on your pantry items (${pantryItems.join(', ')}), ` : '';
   

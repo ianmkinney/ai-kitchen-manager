@@ -28,7 +28,7 @@ export default function PreferencesResults() {
         <h1 className="text-3xl font-bold mb-4">Preferences Saved!</h1>
         
         <p className="text-lg text-gray-600 mb-8">
-          Your dietary preferences have been successfully saved. We'll use these to personalize your experience.
+          Your dietary preferences have been successfully saved. We&apos;ll use these to personalize your experience.
         </p>
         
         <p className="text-gray-500 mb-8">
