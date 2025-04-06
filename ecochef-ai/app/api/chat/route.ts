@@ -9,14 +9,23 @@ const anthropic = new Anthropic({
 
 // Add a proper interface for the preferences
 interface UserPreferences {
-  isVegetarian: boolean;
-  isVegan: boolean;
-  isGlutenFree?: boolean;
-  isDairyFree?: boolean;
-  maxCookingTime?: number;
+  is_vegetarian: boolean;
+  is_vegan: boolean;
+  is_gluten_free?: boolean;
+  is_dairy_free?: boolean;
+  is_nut_free?: boolean;
+  max_cooking_time?: number;
+  cooking_skill_level?: string;
   cuisine?: string;
-  peopleCount?: number;
-  [key: string]: boolean | number | string | undefined;
+  people_count?: number;
+  spicy_preference?: number;
+  sweet_preference?: number;
+  savory_preference?: number;
+  preferred_cuisines?: string[];
+  diet_goals?: string[];
+  allergies?: string[];
+  disliked_ingredients?: string[];
+  [key: string]: boolean | number | string | string[] | undefined;
 }
 
 // Add fallback suggestions for when the API is slow
@@ -25,11 +34,16 @@ const getFallbackSuggestions = (preferences: unknown) => {
   const prefs = preferences as UserPreferences;
   
   // Check dietary restrictions and return appropriate fallback suggestions
-  const isVegetarian = prefs.isVegetarian;
-  const isVegan = prefs.isVegan;
+  const isVegetarian = prefs.is_vegetarian;
+  const isVegan = prefs.is_vegan;
+  const isGlutenFree = prefs.is_gluten_free;
+  const isDairyFree = prefs.is_dairy_free;
   const cuisine = prefs.cuisine || 'Any';
+  const peopleCount = prefs.people_count || 2;
+  const allergies = prefs.allergies || [];
+  const dislikedIngredients = prefs.disliked_ingredients || [];
   
-  let suggestions = `Here are some meal suggestions based on your preferences (cuisine: ${cuisine}):\n\n`;
+  let suggestions = `Here are some meal suggestions based on your preferences (cuisine: ${cuisine}, serving ${peopleCount}):\n\n`;
   
   if (isVegan) {
     suggestions += "1. Chickpea and vegetable curry with brown rice\n";
@@ -45,7 +59,21 @@ const getFallbackSuggestions = (preferences: unknown) => {
     suggestions += "3. Turkey and vegetable stir-fry with brown rice\n\n";
   }
   
-  suggestions += "Nutrition Advice: Focus on whole foods, plenty of vegetables, lean proteins, and whole grains. Stay hydrated and try to limit processed foods.";
+  suggestions += "Nutrition Advice: Focus on whole foods, plenty of vegetables, lean proteins, and whole grains. ";
+  
+  if (isGlutenFree) {
+    suggestions += "Choose gluten-free grains like rice, quinoa, and certified gluten-free oats. ";
+  }
+  
+  if (isDairyFree) {
+    suggestions += "Try plant-based alternatives like almond milk, coconut yogurt, or nutritional yeast for cheesy flavor. ";
+  }
+  
+  if (allergies.length > 0) {
+    suggestions += `Be careful to avoid your allergens (${allergies.join(', ')}) and read labels carefully. `;
+  }
+  
+  suggestions += "Stay hydrated and try to limit processed foods.";
   
   return suggestions;
 };
@@ -69,13 +97,31 @@ export async function POST(request: Request) {
     // Create a enhanced message with detailed preferences
     const enhancedMessage = `
       Based on the following dietary preferences:
-      - ${preferences.isVegetarian ? 'Is Vegetarian' : 'Not Vegetarian'}
-      - ${preferences.isVegan ? 'Is Vegan' : 'Not Vegan'}
-      - ${preferences.isGlutenFree ? 'Needs Gluten-Free options' : 'Can eat gluten'}
-      - ${preferences.isDairyFree ? 'Needs Dairy-Free options' : 'Can consume dairy'}
+      - ${preferences.is_vegetarian ? 'Is Vegetarian' : 'Not Vegetarian'}
+      - ${preferences.is_vegan ? 'Is Vegan' : 'Not Vegan'}
+      - ${preferences.is_gluten_free ? 'Needs Gluten-Free options' : 'Can eat gluten'}
+      - ${preferences.is_dairy_free ? 'Needs Dairy-Free options' : 'Can consume dairy'}
+      - ${preferences.is_nut_free ? 'Needs Nut-Free options' : 'Can consume nuts'}
       - Preferred cuisine: ${preferences.cuisine || 'Any'}
-      - Cooking for: ${preferences.peopleCount || 2} people
-      - Maximum cooking time: ${preferences.maxCookingTime || 60} minutes
+      - Cooking for: ${preferences.people_count || 2} people
+      - Maximum cooking time: ${preferences.max_cooking_time || 60} minutes
+      - Cooking skill level: ${preferences.cooking_skill_level || 'Intermediate'}
+      
+      ${preferences.preferred_cuisines && preferences.preferred_cuisines.length > 0 
+        ? `- Cuisines of interest: ${preferences.preferred_cuisines.join(', ')}`
+        : ''}
+      
+      ${preferences.allergies && preferences.allergies.length > 0 
+        ? `- Allergies/Sensitivities: ${preferences.allergies.join(', ')}`
+        : ''}
+      
+      ${preferences.disliked_ingredients && preferences.disliked_ingredients.length > 0 
+        ? `- Dislikes/Avoids: ${preferences.disliked_ingredients.join(', ')}`
+        : ''}
+      
+      ${preferences.diet_goals && preferences.diet_goals.length > 0 
+        ? `- Dietary goals: ${preferences.diet_goals.join(', ')}`
+        : ''}
       
       ${message}
       

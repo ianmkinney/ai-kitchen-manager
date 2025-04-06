@@ -14,6 +14,8 @@ model User {
   email         String   @unique
   name          String?
   preferences   UserPreferences?
+  pantryItems   PantryItem[]
+  shoppingItems ShoppingListItem[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -47,4 +49,30 @@ model UserPreferences {
   
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+model PantryItem {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  quantity    Float    @default(1)
+  unit        String   @default("item")
+  expiration  DateTime?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ShoppingListItem {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   @default("Other")
+  quantity    Float    @default(1)
+  unit        String   @default("item")
+  isChecked   Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 } 

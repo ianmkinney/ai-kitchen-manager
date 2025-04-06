@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Header from "./components/Header";
+import Navbar from './components/Navbar';
+import { AuthProvider } from "./lib/auth-context";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,18 +18,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-grow bg-gradient-to-b from-primary-50 to-white">
+      <body className="min-h-screen bg-gray-50">
+        <AuthProvider>
+          <Navbar />
+          <main className="min-h-screen pb-16">
             {children}
           </main>
-          <footer className="bg-primary-800 text-white py-4 text-center text-sm">
-            <div className="container mx-auto">
-              EcoChef AI - Sustainable cooking powered by artificial intelligence
-            </div>
-          </footer>
-        </div>
+        </AuthProvider>
       </body>
     </html>
   );
