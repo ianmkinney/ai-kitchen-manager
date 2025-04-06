@@ -26,7 +26,7 @@ export default function Error({
       <h1 className="text-3xl font-bold mb-4 text-center">Something Went Wrong</h1>
       
       <p className="text-lg text-gray-600 mb-8 text-center max-w-xl">
-        We're sorry, but we encountered an unexpected error. Our team has been notified and we're working to fix the issue.
+        We&apos;re sorry, but we encountered an unexpected error. Our team has been notified and we&apos;re working to fix the issue.
       </p>
       
       <div className="flex gap-4">
