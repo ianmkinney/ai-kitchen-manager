@@ -47,19 +47,16 @@ export default function Header() {
           <Link href="/recipes" className="hover:text-white/80 transition-colors">
             Cooking Assistant
           </Link>
-          {!isLoading && (
-            hasPreferences ? (
-              <Link href="/profile" className="hover:text-white/80 transition-colors flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-                Profile
-              </Link>
-            ) : (
-              <Link href="/preferences/quiz" className="hover:text-white/80 transition-colors">
-                Dietary Quiz
-              </Link>
-            )
+          <Link href="/profile" className="hover:text-white/80 transition-colors flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+            Profile
+          </Link>
+          {!isLoading && !hasPreferences && (
+            <Link href="/preferences/quiz" className="hover:text-white/80 transition-colors">
+              Dietary Quiz
+            </Link>
           )}
         </nav>
       </div>
