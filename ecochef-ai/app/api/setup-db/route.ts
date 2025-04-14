@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { createServerClient } from '../../lib/supabase-server';
 
 // This endpoint is for initializing the database 
 // It should be called once during deployment or initial setup
@@ -18,6 +19,9 @@ export async function POST(request: Request) {
         { status: 401 }
       );
     }
+    
+    // Initialize the Supabase client
+    const supabase = await createServerClient();
     
     // Run the database setup function
     await supabase.rpc('setup_database', {});
@@ -113,4 +117,4 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-*/ 
+*/
