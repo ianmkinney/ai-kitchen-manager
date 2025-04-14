@@ -24,7 +24,7 @@ export async function GET() {
     // Get user preferences
     const userPrefs = await prisma.user_preferences.findUnique({
       where: {
-        userId: user.id
+        userid: user.id
       }
     });
     
