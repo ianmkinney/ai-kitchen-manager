@@ -10,13 +10,14 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  preferences   UserPreferences?
-  pantryItems   PantryItem[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String            @id @default(cuid())
+  email           String            @unique
+  name            String?
+  preferences     UserPreferences?
+  pantryItems     PantryItem[]
+  shoppingItems   ShoppingListItem[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 }
 
 model UserPreferences {
@@ -60,4 +61,20 @@ model PantryItem {
   
   @@index([userId])
   @@index([name])
+}
+
+model ShoppingListItem {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   @default("Other")  
+  quantity    Float    @default(1)
+  unit        String   @default("item")
+  isChecked   Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([category])
 } 

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '../lib/supabase';
+import { createBrowserClient } from '../lib/supabase';
+import { useAuth } from '../lib/auth-context';
 
 // Define interfaces for our data structure
 interface UserPreferences {
@@ -14,33 +15,71 @@ interface UserPreferences {
   maxCookingTime: number;
   cookingSkillLevel: string;
   peopleCount: number;
-  cuisinePreferences: string[];
-  flavorPreferences: string[];
-  healthGoals: string[];
+  preferredCuisines: string[];
+  dietGoals: string[];
   allergies: string[];
-  sustainabilityPreference: string;
-  nutritionFocus: string[];
+  spicyPreference: number;
+  sweetPreference: number;
+  savoryPreference: number;
   createdAt: string;
   updatedAt: string;
 }
 
+// Interface for the database response with lowercase keys
+interface DBUserPreferences {
+  id: string;
+  userid: string;
+  isvegetarian: boolean;
+  isvegan: boolean;
+  isglutenfree: boolean;
+  isdairyfree: boolean;
+  isnutfree: boolean;
+  maxcookingtime: number;
+  cookingskilllevel: string;
+  peoplecount: number;
+  preferredcuisines: string[];
+  dietgoals: string[];
+  allergies: string[];
+  spicypreference: number;
+  sweetpreference: number;
+  savorypreference: number;
+  createdat: string;
+  updatedat: string;
+}
+
 export default function ProfilePage() {
+  const { user } = useAuth();
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUserPreferences();
-  }, []);
+    if (user) {
+      fetchUserPreferences();
+    } else {
+      setIsLoading(false);
+      setError('Please log in to view your preferences');
+    }
+  }, [user]);
 
   // Fetch user preferences from Supabase
   const fetchUserPreferences = async () => {
     setIsLoading(true);
     setError(null);
+    
+    if (!user) {
+      setError('Please log in to view your preferences');
+      setIsLoading(false);
+      return;
+    }
+    
     try {
+      const supabase = createBrowserClient();
+      
       const { data, error } = await supabase
         .from('user_preferences')
         .select('*')
+        .eq('userid', user.id)
         .single();
 
       if (error) {
@@ -60,7 +99,27 @@ export default function ProfilePage() {
         throw error;
       }
 
-      setPreferences(data as UserPreferences);
+      // Map the database response to our interface with camelCase properties
+      const mappedPreferences: UserPreferences = {
+        isVegetarian: data.isvegetarian,
+        isVegan: data.isvegan,
+        isGlutenFree: data.isglutenfree,
+        isDairyFree: data.isdairyfree,
+        isNutFree: data.isnutfree,
+        maxCookingTime: data.maxcookingtime,
+        cookingSkillLevel: data.cookingskilllevel,
+        peopleCount: data.peoplecount,
+        preferredCuisines: data.preferredcuisines || [],
+        dietGoals: data.dietgoals || [],
+        allergies: data.allergies || [],
+        spicyPreference: data.spicypreference,
+        sweetPreference: data.sweetpreference,
+        savoryPreference: data.savorypreference,
+        createdAt: data.createdat,
+        updatedAt: data.updatedat
+      };
+
+      setPreferences(mappedPreferences);
     } catch (error) {
       console.error('Error fetching preferences:', error);
       setError('There was an error loading your preferences. Please try again later.');
@@ -79,6 +138,20 @@ export default function ProfilePage() {
   const formatBoolean = (value: boolean | undefined) => {
     return value ? 'Yes' : 'No';
   };
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="card text-center">
+          <h1 className="text-2xl font-bold mb-4">Please Log In</h1>
+          <p className="mb-6">You need to be logged in to view your profile.</p>
+          <Link href="/login" className="btn-primary">
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -162,11 +235,19 @@ export default function ProfilePage() {
             <div className="space-y-3">
               <div className="flex flex-col">
                 <span className="text-gray-600">Preferred Cuisines:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.cuisinePreferences)}</span>
+                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.preferredCuisines)}</span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-gray-600">Flavor Preferences:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.flavorPreferences)}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Spicy Preference:</span>
+                <span className="font-medium">{preferences.spicyPreference}/10</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Sweet Preference:</span>
+                <span className="font-medium">{preferences.sweetPreference}/10</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Savory Preference:</span>
+                <span className="font-medium">{preferences.savoryPreference}/10</span>
               </div>
             </div>
           </section>
@@ -176,15 +257,11 @@ export default function ProfilePage() {
             <div className="space-y-3">
               <div className="flex flex-col">
                 <span className="text-gray-600">Health Goals:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.healthGoals)}</span>
+                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.dietGoals)}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-600">Nutrition Focus:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.nutritionFocus)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Sustainability Priority:</span>
-                <span className="font-medium">{preferences.sustainabilityPreference}</span>
+                <span className="text-gray-600">Allergies:</span>
+                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.allergies)}</span>
               </div>
             </div>
           </section>
@@ -198,11 +275,11 @@ export default function ProfilePage() {
               {preferences.isVegetarian && <li>Rich in plant-based proteins like legumes and tofu</li>}
               {preferences.isGlutenFree && <li>Centered around naturally gluten-free grains like rice and quinoa</li>}
               {preferences.isDairyFree && <li>Using nutritious dairy alternatives like almond or oat milk</li>}
-              {preferences.healthGoals?.includes('weight-loss') && <li>Lower in calories but high in nutrients</li>}
-              {preferences.healthGoals?.includes('muscle-gain') && <li>Higher in protein with complex carbohydrates</li>}
-              {preferences.healthGoals?.includes('energy') && <li>Balanced with complex carbs for sustained energy</li>}
-              {preferences.nutritionFocus?.includes('high-protein') && <li>Focused on quality protein sources</li>}
-              {preferences.nutritionFocus?.includes('low-carb') && <li>Emphasizing vegetables and healthy fats</li>}
+              {preferences.dietGoals?.includes('weight-loss') && <li>Lower in calories but high in nutrients</li>}
+              {preferences.dietGoals?.includes('muscle-gain') && <li>Higher in protein with complex carbohydrates</li>}
+              {preferences.dietGoals?.includes('energy') && <li>Balanced with complex carbs for sustained energy</li>}
+              {preferences.spicyPreference > 7 && <li>More flavorful with spicy elements</li>}
+              {preferences.sweetPreference > 7 && <li>Including moderate amounts of natural sweetness</li>}
               <li>Quick to prepare (under {preferences.maxCookingTime} minutes)</li>
               <li>Suitable for your {preferences.cookingSkillLevel} cooking skill level</li>
             </ul>

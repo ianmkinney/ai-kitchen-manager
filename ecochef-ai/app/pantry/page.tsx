@@ -4,13 +4,49 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+// Define pantry item interface
+interface PantryItem {
+  id: string;
+  name: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Define a type for shopping items
+interface ShoppingItem {
+  id: string;
+  name: string;
+  isChecked: boolean;
+}
+
+// Define the ShoppingSuggestion type
+interface ShoppingSuggestion {
+  name: string;
+  category: string;
+}
+
+// Define recipe interface
+interface Recipe {
+  name: string;
+  ingredients: string[];
+  instructions: string[];
+}
+
 export default function Pantry() {
-  const [pantryItems, setPantryItems] = useState<string[]>([]);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [newItem, setNewItem] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [aiSuggestions, setAiSuggestions] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newPantryItem, setNewPantryItem] = useState('');
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+  const [newShoppingItem, setNewShoppingItem] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recipes, setRecipes] = useState<Recipe[]>([]); // Add state for recipes
 
   // Load pantry items on component mount
   useEffect(() => {
@@ -48,7 +84,7 @@ export default function Pantry() {
         throw error;
       }
 
-      setPantryItems(data?.map(item => item.name) || []);
+      setPantryItems(data?.map(item => item) || []);
     } catch (error) {
       console.error('Error fetching pantry items:', error);
       setError('There was an error loading your pantry items. Please check the console for details.');
@@ -59,48 +95,56 @@ export default function Pantry() {
 
   // Add item to pantry
   const addPantryItem = async () => {
-    if (!newItem.trim()) return;
+    if (!newPantryItem.trim()) return;
     
     try {
-      const { error } = await supabase
-        .from('pantry_items')
-        .insert([{ 
-          name: newItem.trim(),
-          // Use anonymous user ID if needed
-          userId: '00000000-0000-0000-0000-000000000000'
-        }]);
-
-      if (error) {
-        console.error('Error adding item:', error);
-        
-        // Handle column name mismatch
-        if (error.message && error.message.includes('column') && error.message.includes('does not exist')) {
-          setError('Database schema mismatch. Column names may be incorrect. Please reinitialize the database.');
-          return;
-        }
-        
-        throw error;
+      // Use API route instead of direct Supabase client
+      const response = await fetch('/api/pantry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newPantryItem.trim()
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add item');
       }
       
-      setPantryItems([newItem.trim(), ...pantryItems]);
-      setNewItem('');
+      // Refresh the pantry items list
+      fetchPantryItems();
+      setNewPantryItem('');
     } catch (error) {
       console.error('Error adding pantry item:', error);
-      setError('There was an error adding the item. Please make sure your database is set up correctly.');
+      setError('There was an error adding the item. Please check your connection and try again.');
     }
   };
 
   // Remove item from pantry
-  const removePantryItem = async (itemToRemove: string) => {
+  const removePantryItem = async (itemName: string) => {
     try {
-      const { error } = await supabase
-        .from('pantry_items')
-        .delete()
-        .match({ name: itemToRemove });
-
-      if (error) throw error;
+      // Find the item ID based on name
+      const item = pantryItems.find(item => item.name === itemName);
+      if (!item) {
+        console.error('Item not found:', itemName);
+        return;
+      }
       
-      setPantryItems(pantryItems.filter(item => item !== itemToRemove));
+      // Use API route instead of direct Supabase client
+      const response = await fetch(`/api/pantry?id=${item.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove item');
+      }
+      
+      // Refresh the pantry items
+      fetchPantryItems();
     } catch (error) {
       console.error('Error removing pantry item:', error);
       setError('There was an error removing the item. Please try again later.');
@@ -114,15 +158,8 @@ export default function Pantry() {
     setError(null);
     
     try {
-      // Get user preferences
-      const { data: preferencesData, error: preferencesError } = await supabase
-        .from('user_preferences')
-        .select('*')
-        .single();
-      
-      if (preferencesError && preferencesError.code !== 'PGRST116') {
-        console.error('Error fetching preferences:', preferencesError);
-      }
+      // Extract names from pantry items
+      const pantryNames = pantryItems.map(item => item.name);
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -130,19 +167,155 @@ export default function Pantry() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: `Based on my current pantry items (${pantryItems.join(', ')}), what additional ingredients should I buy to make interesting meals? Please suggest 3-5 ingredients that would pair well with what I already have.`,
-          preferences: preferencesData || {},
-          pantryItems
+          message: `Here are the items in my pantry: ${pantryNames.join(', ')}. 
+          What should I buy next? Please suggest 5-10 items I might need based on what I already have.`,
+          pantryItems: pantryNames
         }),
       });
       
-      if (!response.ok) throw new Error('Failed to get AI suggestions');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get suggestions');
+      }
       
       const data = await response.json();
-      setAiSuggestions(data.response);
+      setAiSuggestions(data.response || 'No suggestions available.');
     } catch (error) {
       console.error('Error getting AI suggestions:', error);
-      setAiSuggestions('Sorry, there was an error getting AI suggestions. Please try again later.');
+      setAiSuggestions('Sorry, there was an error getting suggestions. Please try again later.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Add item to shopping list
+  const addShoppingItem = async () => {
+    if (!newShoppingItem.trim()) return;
+    
+    try {
+      const res = await fetch('/api/shopping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newShoppingItem,
+          category: 'Other'
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setShoppingItems([...shoppingItems, data.shoppingItem]);
+        setNewShoppingItem('');
+      }
+    } catch (error) {
+      console.error('Error adding shopping item:', error);
+    }
+  };
+
+  // Toggle shopping item check status
+  const toggleShoppingItem = async (id: string, isChecked: boolean) => {
+    try {
+      const res = await fetch('/api/shopping', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          isChecked: !isChecked,
+        }),
+      });
+
+      if (res.ok) {
+        setShoppingItems(
+          shoppingItems.map(item =>
+            item.id === id ? { ...item, isChecked: !isChecked } : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error updating shopping item:', error);
+    }
+  };
+
+  // Remove shopping item
+  const removeShoppingItem = async (id: string) => {
+    try {
+      const res = await fetch(`/api/shopping?id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        setShoppingItems(shoppingItems.filter(item => item.id !== id));
+      }
+    } catch (error) {
+      console.error('Error deleting shopping item:', error);
+    }
+  };
+
+  // Get shopping suggestions
+  const getShoppingSuggestions = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/shopping/suggestions');
+      
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data);
+        setShowSuggestions(true);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error getting shopping suggestions:', error);
+      setLoading(false);
+    }
+  };
+
+  // Add suggestion to shopping list
+  const addSuggestionToShoppingList = async (suggestion: ShoppingSuggestion) => {
+    try {
+      const res = await fetch('/api/shopping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: suggestion.name,
+          category: suggestion.category
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setShoppingItems([...shoppingItems, data.shoppingItem]);
+      }
+    } catch (error) {
+      console.error('Error adding suggestion to shopping list:', error);
+    }
+  };
+
+  // Fetch and display recipes
+  const getRecipes = async () => {
+    try {
+      setIsGenerating(true);
+      const response = await fetch('/api/recipes/suggestions', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRecipes(data); // Store recipes in state
+      } else {
+        console.error('Error fetching recipes:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
     } finally {
       setIsGenerating(false);
     }
@@ -178,16 +351,15 @@ export default function Pantry() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Inventory Section */}
         <section className="card md:col-span-2">
-          <h2 className="text-xl font-semibold mb-4">Current Inventory</h2>
+          <h2 className="text-xl font-semibold mb-4">My Pantry</h2>
           <div className="flex gap-4 mb-4">
             <input
               type="text"
               placeholder="Add new item..."
-              className="input-field"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
+              className="input-field flex-1"
+              value={newPantryItem}
+              onChange={(e) => setNewPantryItem(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addPantryItem()}
-              disabled={!!error?.includes('not initialized') || !!error?.includes('schema mismatch')}
             />
             <button 
               className="btn-primary whitespace-nowrap"
@@ -203,10 +375,10 @@ export default function Pantry() {
           ) : pantryItems.length > 0 ? (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {pantryItems.map((item) => (
-                <li key={item} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                  <span>{item}</span>
+                <li key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                  <span>{item.name}</span>
                   <button 
-                    onClick={() => removePantryItem(item)}
+                    onClick={() => removePantryItem(item.name)}
                     className="text-red-500 hover:text-red-700"
                   >
                     Remove
@@ -249,7 +421,51 @@ export default function Pantry() {
             )}
           </div>
         </section>
+
+        {/* AI Recipe Suggestions */}
+        <section className="card">
+          <h2 className="text-xl font-semibold mb-4">AI Recipe Suggestions</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Get personalized recipe suggestions based on your pantry items.
+          </p>
+
+          <button
+            className={`btn-primary w-full mb-4 ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={getRecipes}
+            disabled={isGenerating || pantryItems.length === 0 || !!error}
+          >
+            {isGenerating ? 'Fetching Recipes...' : 'Get Recipe Suggestions'}
+          </button>
+
+          <div className="bg-gray-50 rounded-lg p-4 min-h-[300px]">
+            {recipes.length > 0 ? (
+              <ul className="space-y-4">
+                {recipes.map((recipe, index) => (
+                  <li key={index} className="p-4 border rounded-lg shadow-sm">
+                    <h3 className="text-lg font-bold mb-2">{recipe.name}</h3>
+                    <p className="text-sm font-semibold">Ingredients:</p>
+                    <ul className="list-disc list-inside mb-2">
+                      {recipe.ingredients && recipe.ingredients.map((ingredient, i) => (
+                        <li key={i}>{ingredient}</li>
+                      ))}
+                    </ul>
+                    <p className="text-sm font-semibold">Instructions:</p>
+                    <ol className="list-decimal list-inside">
+                      {recipe.instructions && recipe.instructions.map((instruction, i) => (
+                        <li key={i}>{instruction}</li>
+                      ))}
+                    </ol>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-500 text-center mt-32">
+                {error ? 'Please fix the database setup first.' : 'Click the button above to get recipe suggestions'}
+              </p>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
-} 
+}

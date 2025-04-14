@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { createBrowserClient } from '../lib/supabase';
+
+// Replace the direct supabase instance with a browser client
+const supabase = createBrowserClient();
 
 export default function Header() {
   const [hasPreferences, setHasPreferences] = useState(false);
@@ -30,6 +33,17 @@ export default function Header() {
     checkUserPreferences();
   }, []);
 
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Redirect to login page after logout
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <header className="bg-gradient-to-r from-primary-600 to-primary-500 text-white py-4 shadow-md">
       <div className="container mx-auto px-4 flex justify-between items-center">
@@ -53,6 +67,13 @@ export default function Header() {
             </svg>
             Profile
           </Link>
+          <button onClick={handleLogout} className="hover:text-white/80 transition-colors flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 3a1 1 0 011-1h5a1 1 0 011 1v1h-1V3H4v14h5v-1h1v1a1 1 0 01-1 1H4a1 1 0 01-1-1V3z" clipRule="evenodd" />
+              <path d="M16.707 10.707a1 1 0 00-1.414-1.414L13.5 11.086V6a1 1 0 10-2 0v5.086l-1.793-1.793a1 1 0 00-1.414 1.414l3.5 3.5a1 1 0 001.414 0l3.5-3.5z" />
+            </svg>
+            Logout
+          </button>
           {!isLoading && !hasPreferences && (
             <Link href="/preferences/quiz" className="hover:text-white/80 transition-colors">
               Dietary Quiz
@@ -62,4 +83,4 @@ export default function Header() {
       </div>
     </header>
   );
-} 
+}
