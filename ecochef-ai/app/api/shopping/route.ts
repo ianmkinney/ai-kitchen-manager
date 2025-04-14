@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const shoppingItems = await prisma.ShoppingListItem.findMany({
+    const shoppingItems = await prisma.shoppingListItem.findMany({
       where: {
         userId: user.id
       },
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const newShoppingItem = await prisma.ShoppingListItem.create({
+    const newShoppingItem = await prisma.shoppingListItem.create({
       data: {
         name,
         category: category || 'Other',
@@ -95,7 +95,7 @@ export async function PUT(request: Request) {
     }
     
     // Ensure the item belongs to the current user
-    const existingItem = await prisma.ShoppingListItem.findUnique({
+    const existingItem = await prisma.shoppingListItem.findUnique({
       where: { id }
     });
     
@@ -106,7 +106,7 @@ export async function PUT(request: Request) {
       );
     }
     
-    const updatedItem = await prisma.ShoppingListItem.update({
+    const updatedItem = await prisma.shoppingListItem.update({
       where: { id },
       data: {
         name: name !== undefined ? name : existingItem.name,
@@ -148,7 +148,7 @@ export async function DELETE(request: Request) {
     }
     
     // Ensure the item belongs to the current user
-    const existingItem = await prisma.ShoppingListItem.findUnique({
+    const existingItem = await prisma.shoppingListItem.findUnique({
       where: { id }
     });
     
@@ -159,7 +159,7 @@ export async function DELETE(request: Request) {
       );
     }
     
-    await prisma.ShoppingListItem.delete({
+    await prisma.shoppingListItem.delete({
       where: { id }
     });
     
