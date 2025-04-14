@@ -31,80 +31,80 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch user preferences from Supabase
-  const fetchUserPreferences = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    if (!user) {
-      setError('Please log in to view your preferences');
-      setIsLoading(false);
-      return;
-    }
-    
-    try {
-      const supabase = createBrowserClient();
-      
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .select('*')
-        .eq('userid', user.id)
-        .single();
-
-      if (error) {
-        // Handle common database errors
-        if (error.code === '42P01') {
-          setError('Database tables not initialized yet. Please run the Supabase setup script.');
-          return;
-        }
-        
-        // Not found error is ok for new users
-        if (error.code === 'PGRST116') {
-          setError('No preferences found. Please complete the dietary quiz first.');
-          setIsLoading(false);
-          return;
-        }
-
-        throw error;
-      }
-
-      // Map the database response to our interface with camelCase properties
-      const mappedPreferences: UserPreferences = {
-        isVegetarian: data.isvegetarian,
-        isVegan: data.isvegan,
-        isGlutenFree: data.isglutenfree,
-        isDairyFree: data.isdairyfree,
-        isNutFree: data.isnutfree,
-        maxCookingTime: data.maxcookingtime,
-        cookingSkillLevel: data.cookingskilllevel,
-        peopleCount: data.peoplecount,
-        preferredCuisines: data.preferredcuisines || [],
-        dietGoals: data.dietgoals || [],
-        allergies: data.allergies || [],
-        spicyPreference: data.spicypreference,
-        sweetPreference: data.sweetpreference,
-        savoryPreference: data.savorypreference,
-        createdAt: data.createdat,
-        updatedAt: data.updatedat
-      };
-
-      setPreferences(mappedPreferences);
-    } catch (error) {
-      console.error('Error fetching preferences:', error);
-      setError('There was an error loading your preferences. Please try again later.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    // Fetch user preferences from Supabase
+    const fetchUserPreferences = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      if (!user) {
+        setError('Please log in to view your preferences');
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        const supabase = createBrowserClient();
+        
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('userid', user.id)
+          .single();
+
+        if (error) {
+          // Handle common database errors
+          if (error.code === '42P01') {
+            setError('Database tables not initialized yet. Please run the Supabase setup script.');
+            return;
+          }
+          
+          // Not found error is ok for new users
+          if (error.code === 'PGRST116') {
+            setError('No preferences found. Please complete the dietary quiz first.');
+            setIsLoading(false);
+            return;
+          }
+
+          throw error;
+        }
+
+        // Map the database response to our interface with camelCase properties
+        const mappedPreferences: UserPreferences = {
+          isVegetarian: data.isvegetarian,
+          isVegan: data.isvegan,
+          isGlutenFree: data.isglutenfree,
+          isDairyFree: data.isdairyfree,
+          isNutFree: data.isnutfree,
+          maxCookingTime: data.maxcookingtime,
+          cookingSkillLevel: data.cookingskilllevel,
+          peopleCount: data.peoplecount,
+          preferredCuisines: data.preferredcuisines || [],
+          dietGoals: data.dietgoals || [],
+          allergies: data.allergies || [],
+          spicyPreference: data.spicypreference,
+          sweetPreference: data.sweetpreference,
+          savoryPreference: data.savorypreference,
+          createdAt: data.createdat,
+          updatedAt: data.updatedat
+        };
+
+        setPreferences(mappedPreferences);
+      } catch (error) {
+        console.error('Error fetching preferences:', error);
+        setError('There was an error loading your preferences. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (user) {
       fetchUserPreferences();
     } else {
       setIsLoading(false);
       setError('Please log in to view your preferences');
     }
-  }, [user, fetchUserPreferences]);
+  }, [user]);
 
   // Helper function to format arrays for display
   const formatArrayForDisplay = (arr: string[] | undefined) => {
