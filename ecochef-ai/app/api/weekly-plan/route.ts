@@ -4,8 +4,16 @@ import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
 // Define types for our day and meal structures
 type MealType = 'breakfast' | 'lunch' | 'dinner';
 type DayName = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+type RecipeData = {
+  id?: string;
+  name?: string;
+  ingredients?: string[];
+  instructions?: string[];
+  [key: string]: unknown; // Allow for additional properties
+};
+
 type DayMeals = {
-  [key in MealType]: any[];
+  [key in MealType]: RecipeData[];
 };
 type WeeklyPlanMap = {
   [key in DayName]: DayMeals;
