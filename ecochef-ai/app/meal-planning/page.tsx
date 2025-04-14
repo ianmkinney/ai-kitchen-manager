@@ -493,13 +493,14 @@ export default function MealPlanning() {
     try {
       progressInterval = setInterval(updateProgressBar, 100);
 
-      // We'll use the pantry items already loaded in state to avoid fetching again
-      // This ensures we're using the most recent version and avoid race conditions
-      console.log('Using pantry items from state:', pantryItems);
+      // If pantry items haven't been loaded yet, fetch them
+      if (pantryItems.length === 0) {
+        await fetchPantryItems();
+      }
       
       console.log('Sending request with query:', query);
-      console.log('Using pantry items:', pantryItems);
-      console.log('Sending preferences:', preferences);
+      console.log(`Using ${pantryItems.length} pantry items for recipe generation`);
+      console.log('Using preferences:', preferences);
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -511,10 +512,12 @@ export default function MealPlanning() {
 
 Please create recipes that specifically address this query.
 
-Please respond with only JSON containing an array of recipes that match the user's query. 
-Each recipe should include "name", "ingredients", and "instructions" fields. No extra text or formatting.
+IMPORTANT: Create recipes that prioritize using ingredients from the user's pantry. The available pantry ingredients are: ${pantryItems.join(', ')}
 
-The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE: ${pantryItems.join(', ')}`,
+Please respond with only JSON containing an array of recipes that match the user's query. 
+Each recipe should include "name", "ingredients", and "instructions" fields. 
+In the ingredients list, mark items with an asterisk (*) if they are found in the user's pantry.
+No extra text or formatting.`,
           preferences: preferences,
           pantryItems: pantryItems
         }),
@@ -817,62 +820,36 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
   };
 
   // Generate shopping list from weekly plan
-  const generateShoppingList = () => {
+  const generateShoppingList = async () => {
     setIsGeneratingList(true);
     
     try {
-      // Extract all ingredients from all recipes in the weekly plan
-      const allIngredients: string[] = [];
-      
-      Object.values(weeklyPlan).forEach(dayMeals => {
-        ['breakfast', 'lunch', 'dinner'].forEach(mealTime => {
-          const recipes = dayMeals[mealTime as keyof typeof dayMeals];
-          if (Array.isArray(recipes)) {
-            recipes.forEach(recipe => {
-              if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-                recipe.ingredients.forEach(ingredient => {
-                  // Clean up the ingredient string to extract just the item name
-                  let cleanedIngredient = ingredient.toLowerCase();
-                  
-                  // Remove quantities and measurements
-                  cleanedIngredient = cleanedIngredient.replace(/^\d+\s*(\d\/\d)?(\s*-\s*\d+)?\s*(cups?|tablespoons?|teaspoons?|tbsp|tsp|oz|ounces?|pounds?|lbs?|grams?|g|ml|l|pinch(es)?|dash(es)?|to taste|dozen|slices?)/i, '');
-                  
-                  // Remove common prepositions and adjectives
-                  cleanedIngredient = cleanedIngredient.replace(/^(of|a|an|the|fresh|dried|frozen|large|medium|small|ripe|chopped|minced|diced|sliced|grated)\s+/i, '');
-                  
-                  // Remove anything in parentheses
-                  cleanedIngredient = cleanedIngredient.replace(/\(.*\)/g, '');
-                  
-                  // Trim whitespace and commas
-                  cleanedIngredient = cleanedIngredient.trim().replace(/,$/, '');
-                  
-                  // Only add if it's not empty and not already in the list
-                  if (cleanedIngredient && !allIngredients.includes(cleanedIngredient)) {
-                    allIngredients.push(cleanedIngredient);
-                  }
-                });
-              }
-            });
-          }
-        });
+      // Call the API endpoint to generate the shopping list with a cache-busting timestamp
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/shopping/weekly-list?t=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
       
-      // Filter out ingredients that are already in the pantry
-      const missingIngredients = allIngredients.filter(ingredient => 
-        !pantryItems.some(pantryItem => 
-          pantryItem.toLowerCase().includes(ingredient) || 
-          ingredient.includes(pantryItem.toLowerCase())
-        )
-      );
+      if (!response.ok) {
+        throw new Error(`Failed to generate shopping list: ${response.status}`);
+      }
       
-      // Convert to shopping items
-      const newShoppingList: ShoppingItem[] = missingIngredients.map(item => ({
-        name: item.trim(),
-        category: categorizeIngredient(item.trim())
-      }));
+      const data = await response.json();
       
-      setShoppingList(newShoppingList);
+      // Set the shopping list state with the returned data
+      setShoppingList(data.shoppingList || []);
       setShowShoppingList(true);
+      
+      // Log the results for debugging
+      console.log('Shopping list generated:', data);
+      
+      if (data.shoppingList && data.shoppingList.length === 0) {
+        alert('All ingredients are already in your pantry!');
+      }
     } catch (error) {
       console.error('Error generating shopping list:', error);
       alert('Failed to generate shopping list. Please try again.');
@@ -880,33 +857,7 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
       setIsGeneratingList(false);
     }
   };
-  
-  // Helper function to categorize ingredients
-  const categorizeIngredient = (ingredient: string): string => {
-    const lowerIngredient = ingredient.toLowerCase();
-    
-    // Common categories
-    if (/chicken|beef|pork|turkey|lamb|fish|shrimp|salmon|tofu|tempeh|seitan/.test(lowerIngredient)) {
-      return 'Protein';
-    } else if (/milk|cheese|yogurt|cream|butter|sour cream/.test(lowerIngredient)) {
-      return 'Dairy';
-    } else if (/apple|banana|orange|grape|berry|blueberry|strawberry|raspberry|melon|watermelon|kiwi|mango|pineapple/.test(lowerIngredient)) {
-      return 'Fruit';
-    } else if (/lettuce|spinach|kale|carrot|broccoli|pepper|onion|garlic|cucumber|tomato|potato|bean|lentil|zucchini|squash|eggplant|asparagus|celery/.test(lowerIngredient)) {
-      return 'Vegetables';
-    } else if (/flour|sugar|salt|pepper|oil|vinegar|spice|herb|oregano|basil|thyme|cumin|cinnamon|nutmeg|vanilla|baking powder|baking soda/.test(lowerIngredient)) {
-      return 'Pantry Staples';
-    } else if (/bread|bagel|tortilla|wrap|pita|bun|roll/.test(lowerIngredient)) {
-      return 'Bread';
-    } else if (/pasta|rice|quinoa|oat|barley|couscous|noodle/.test(lowerIngredient)) {
-      return 'Grains';
-    } else if (/almond|cashew|peanut|walnut|pecan|seed|nut/.test(lowerIngredient)) {
-      return 'Nuts & Seeds';
-    }
-    
-    return 'Other';
-  };
-  
+
   // Add items to shopping list in pantry
   const addToShoppingList = async () => {
     if (shoppingList.length === 0) return;
