@@ -79,7 +79,7 @@ const getFallbackSuggestions = (preferences: unknown, pantryItems: string[] = []
   return suggestions;
 };
 
-const generateRecipeJSON = (recipes: any[]) => {
+const generateRecipeJSON = (recipes: { name: string; ingredients: string[]; instructions: string[] }[]) => {
   return JSON.stringify(recipes, null, 2);
 };
 
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     }
     
     // Create server client with our helper
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     
     // Get pantry items from Supabase
     let pantryItemsData: { name: string }[] = [];
@@ -345,4 +345,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

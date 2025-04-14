@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     }
     
     // Create server client with our helper
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     
     // Get user preferences
     const userPrefs = await prisma.userPreferences.findUnique({
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     }
     
     // Format pantry items for Claude
-    const pantryItemsText = pantryItems.map((item: any) => 
+    const pantryItemsText = pantryItems.map((item: { name: string }) => 
       `${item.name}`
     ).join('\n');
     
@@ -178,4 +178,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

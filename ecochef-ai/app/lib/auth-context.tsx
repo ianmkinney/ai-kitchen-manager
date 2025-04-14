@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createBrowserClient } from './supabase';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
   id: string;

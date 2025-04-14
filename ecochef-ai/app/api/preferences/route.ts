@@ -28,6 +28,10 @@ export async function GET(request: Request) {
       );
     }
 
+    if (typeof authData.user.email !== 'string') {
+      throw new Error('Invalid email format');
+    }
+
     const userId = await getUserIdFromAuthUsers(authData.user.email);
 
     const { data, error } = await supabase
@@ -70,6 +74,10 @@ export async function POST(request: Request) {
         { error: 'You must be logged in to access this resource' },
         { status: 401 }
       );
+    }
+
+    if (typeof authData.user.email !== 'string') {
+      throw new Error('Invalid email format');
     }
 
     const userId = await getUserIdFromAuthUsers(authData.user.email);
