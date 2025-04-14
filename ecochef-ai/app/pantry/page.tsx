@@ -20,10 +20,28 @@ interface Recipe {
   instructions: string[];
 }
 
+// Define shopping suggestion interfaces
+interface ShoppingItemSuggestion {
+  name: string;
+  category: string;
+  reason: string;
+}
+
+interface RecipeIdea {
+  name: string;
+  ingredients: string[];
+  description: string;
+}
+
+interface ShoppingSuggestion {
+  shoppingListSuggestions: ShoppingItemSuggestion[];
+  recipeIdeas: RecipeIdea[];
+}
+
 export default function Pantry() {
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [aiSuggestions, setAiSuggestions] = useState<string>('');
+  const [aiSuggestions, setAiSuggestions] = useState<ShoppingSuggestion | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newPantryItem, setNewPantryItem] = useState('');
@@ -132,26 +150,18 @@ export default function Pantry() {
     }
   };
 
-  // Get AI shopping suggestions
+  // Get AI shopping suggestions from dedicated API
   const getAiSuggestions = async () => {
     setIsGenerating(true);
-    setAiSuggestions('');
+    setAiSuggestions(null);
     setError(null);
     
     try {
-      // Extract names from pantry items
-      const pantryNames = pantryItems.map(item => item.itemName);
-      
-      const response = await fetch('/api/chat', {
-        method: 'POST',
+      const response = await fetch('/api/shopping/suggestions', {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Here are the items in my pantry: ${pantryNames.join(', ')}. 
-          What should I buy next? Please suggest 5-10 items I might need based on what I already have.`,
-          pantryItems: pantryNames
-        }),
+        }
       });
       
       if (!response.ok) {
@@ -160,12 +170,36 @@ export default function Pantry() {
       }
       
       const data = await response.json();
-      setAiSuggestions(data.response || 'No suggestions available.');
+      setAiSuggestions(data);
     } catch (error) {
       console.error('Error getting AI suggestions:', error);
-      setAiSuggestions('Sorry, there was an error getting suggestions. Please try again later.');
+      setError('Sorry, there was an error getting shopping suggestions. Please try again later.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Clear all pantry items
+  const clearAllPantryItems = async () => {
+    if (!confirm("Are you sure you want to remove ALL items from your pantry?")) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/pantry/clear', {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to clear pantry');
+      }
+      
+      // Refresh the pantry items
+      fetchPantryItems();
+    } catch (error) {
+      console.error('Error clearing pantry:', error);
+      setError('There was an error clearing your pantry. Please try again later.');
     }
   };
 
@@ -223,7 +257,17 @@ export default function Pantry() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Inventory Section */}
         <section className="card md:col-span-2">
-          <h2 className="text-xl font-semibold mb-4">My Pantry</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">My Pantry</h2>
+            {pantryItems.length > 0 && (
+              <button 
+                className="text-red-500 hover:text-red-700 text-sm font-medium"
+                onClick={clearAllPantryItems}
+              >
+                Clear All Items
+              </button>
+            )}
+          </div>
           <div className="flex gap-4 mb-4">
             <input
               type="text"
@@ -269,26 +313,67 @@ export default function Pantry() {
         <section className="card">
           <h2 className="text-xl font-semibold mb-4">AI Shopping Assistant</h2>
           <p className="text-sm text-gray-600 mb-4">
-            Get personalized suggestions for ingredients to buy based on what&apos;s already in your pantry and your dietary preferences.
+            Get a personalized shopping list based on what&apos;s missing from your pantry and your dietary preferences.
           </p>
           
           <button 
             className={`btn-primary w-full mb-4 ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={getAiSuggestions}
-            disabled={isGenerating || pantryItems.length === 0 || !!error}
+            disabled={isGenerating || !!error}
           >
-            {isGenerating ? 'Generating Suggestions...' : 'Get Shopping Suggestions'}
+            {isGenerating ? 'Generating Shopping List...' : 'Get Shopping List'}
           </button>
           
-          <div className="bg-gray-50 rounded-lg p-4 min-h-[300px]">
+          <div className="bg-gray-50 rounded-lg p-4 min-h-[300px] overflow-y-auto">
             {aiSuggestions ? (
-              <div className="whitespace-pre-line">{aiSuggestions}</div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Suggested Shopping List</h3>
+                {aiSuggestions.shoppingListSuggestions.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Group suggestions by category */}
+                    {Array.from(new Set(aiSuggestions.shoppingListSuggestions.map(item => item.category))).map(category => (
+                      <div key={category} className="mb-3">
+                        <h4 className="font-medium text-sm border-b pb-1 mb-2">{category}</h4>
+                        <ul className="pl-4 space-y-2">
+                          {aiSuggestions.shoppingListSuggestions
+                            .filter(item => item.category === category)
+                            .map((item, index) => (
+                              <li key={index} className="text-sm">
+                                <span className="font-medium">{item.name}</span>
+                                <p className="text-xs text-gray-600 mt-1">{item.reason}</p>
+                              </li>
+                            ))
+                          }
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No shopping suggestions available.</p>
+                )}
+                
+                {aiSuggestions.recipeIdeas && aiSuggestions.recipeIdeas.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h3 className="text-lg font-semibold mb-2">Recipe Ideas With These Ingredients</h3>
+                    <div className="space-y-3">
+                      {aiSuggestions.recipeIdeas.map((recipe, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg shadow-sm">
+                          <h4 className="font-medium text-base">{recipe.name}</h4>
+                          <p className="text-xs text-gray-600 mt-1">{recipe.description}</p>
+                          <div className="mt-2">
+                            <span className="text-xs font-medium">Ingredients: </span>
+                            <span className="text-xs">{recipe.ingredients.join(', ')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <p className="text-gray-500 text-center mt-32">
                 {error ? 'Please fix the database setup first.' 
-                  : pantryItems.length === 0 
-                  ? 'Add items to your pantry first'
-                  : 'Click the button above to get AI suggestions'}
+                  : 'Click the button above to get AI shopping suggestions'}
               </p>
             )}
           </div>
@@ -309,11 +394,11 @@ export default function Pantry() {
             {isGenerating ? 'Fetching Recipes...' : 'Get Recipe Suggestions'}
           </button>
 
-          <div className="bg-gray-50 rounded-lg p-4 min-h-[300px]">
+          <div className="bg-gray-50 rounded-lg p-4 min-h-[300px] overflow-y-auto">
             {recipes.length > 0 ? (
               <ul className="space-y-4">
                 {recipes.map((recipe, index) => (
-                  <li key={index} className="p-4 border rounded-lg shadow-sm">
+                  <li key={index} className="p-4 border bg-white rounded-lg shadow-sm">
                     <h3 className="text-lg font-bold mb-2">{recipe.name}</h3>
                     <p className="text-sm font-semibold">Ingredients:</p>
                     <ul className="list-disc list-inside mb-2">

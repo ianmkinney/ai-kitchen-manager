@@ -93,12 +93,14 @@ function DroppableMealTime({
   day, 
   mealTime, 
   onDrop, 
-  meals 
+  meals,
+  onRemove 
 }: { 
   day: string; 
   mealTime: MealTime; 
   onDrop: (day: string, mealTime: MealTime, recipe: Recipe) => void; 
-  meals: Recipe[] 
+  meals: Recipe[];
+  onRemove: (day: string, mealTime: MealTime, index: number) => void;
 }) {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ItemType.RECIPE,
@@ -121,10 +123,24 @@ function DroppableMealTime({
       {meals.map((meal, index) => (
         <div
           key={index}
-          className="text-xs text-gray-800 mb-1 cursor-pointer hover:text-blue-600"
-          onClick={() => handleClick(meal)}
+          className="text-xs text-gray-800 mb-1 flex justify-between items-center"
         >
-          {meal.name}
+          <span 
+            className="cursor-pointer hover:text-blue-600"
+            onClick={() => handleClick(meal)}
+          >
+            {meal.name}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(day, mealTime, index);
+            }}
+            className="text-red-500 hover:text-red-700 ml-2 text-xs"
+            title="Remove meal"
+          >
+            ✕
+          </button>
         </div>
       ))}
       {meals.length === 0 && (
@@ -134,7 +150,12 @@ function DroppableMealTime({
   );
 }
 
-function DroppableDay({ day, onDrop, dailyMeals }: { day: string; onDrop: (day: string, mealTime: MealTime, recipe: Recipe) => void; dailyMeals: DailyMeals }) {
+function DroppableDay({ day, onDrop, onRemove, dailyMeals }: { 
+  day: string; 
+  onDrop: (day: string, mealTime: MealTime, recipe: Recipe) => void; 
+  onRemove: (day: string, mealTime: MealTime, index: number) => void;
+  dailyMeals: DailyMeals 
+}) {
   return (
     <div className="flex flex-col space-y-2">
       <h3 className="font-medium text-center mb-1">{day}</h3>
@@ -142,19 +163,22 @@ function DroppableDay({ day, onDrop, dailyMeals }: { day: string; onDrop: (day: 
         day={day} 
         mealTime="breakfast" 
         meals={dailyMeals.breakfast} 
-        onDrop={onDrop} 
+        onDrop={onDrop}
+        onRemove={onRemove}
       />
       <DroppableMealTime 
         day={day} 
         mealTime="lunch" 
         meals={dailyMeals.lunch} 
-        onDrop={onDrop} 
+        onDrop={onDrop}
+        onRemove={onRemove}
       />
       <DroppableMealTime 
         day={day} 
         mealTime="dinner" 
         meals={dailyMeals.dinner} 
-        onDrop={onDrop} 
+        onDrop={onDrop}
+        onRemove={onRemove}
       />
     </div>
   );
@@ -469,21 +493,10 @@ export default function MealPlanning() {
     try {
       progressInterval = setInterval(updateProgressBar, 100);
 
-      // First, fetch pantry items
-      const pantryResponse = await fetch('/api/pantry');
-      let pantryItems: string[] = [];
+      // We'll use the pantry items already loaded in state to avoid fetching again
+      // This ensures we're using the most recent version and avoid race conditions
+      console.log('Using pantry items from state:', pantryItems);
       
-      if (pantryResponse.ok) {
-        const pantryData = await pantryResponse.json();
-        if (pantryData.pantryItems && Array.isArray(pantryData.pantryItems)) {
-          // Extract names from pantry items
-          pantryItems = pantryData.pantryItems.map((item: {itemName?: string, name?: string}) => 
-            item.itemName || item.name || '').filter(Boolean);
-        }
-      } else {
-        console.warn('Failed to fetch pantry items');
-      }
-
       console.log('Sending request with query:', query);
       console.log('Using pantry items:', pantryItems);
       console.log('Sending preferences:', preferences);
@@ -658,7 +671,22 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
     }
   };
 
-  // Handle dropping a recipe into a specific meal time slot
+  // Add a function to remove a meal from the weekly plan
+  const removeMeal = (day: string, mealTime: MealTime, index: number) => {
+    setWeeklyPlan(prevPlan => {
+      // Create a copy of the plan
+      const newPlan = {...prevPlan};
+      
+      // Remove the meal at the specified index
+      newPlan[day][mealTime] = [
+        ...newPlan[day][mealTime].slice(0, index),
+        ...newPlan[day][mealTime].slice(index + 1)
+      ];
+      
+      return newPlan;
+    });
+  };
+
   const handleDrop = (day: string, mealTime: MealTime, recipe: Recipe) => {
     setWeeklyPlan(prev => {
       const newPlan = { ...prev };
@@ -1199,6 +1227,7 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
                 day={day}
                 dailyMeals={weeklyPlan[day]}
                 onDrop={handleDrop}
+                onRemove={removeMeal}
               />
             ))}
           </div>
