@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
 
+// Define types for our day and meal structures
+type MealType = 'breakfast' | 'lunch' | 'dinner';
+type DayName = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+type DayMeals = {
+  [key in MealType]: any[];
+};
+type WeeklyPlanMap = {
+  [key in DayName]: DayMeals;
+};
+
 // GET - Retrieve weekly plan for the current user
 export async function GET(request: Request) {
   try {
@@ -45,7 +55,7 @@ export async function GET(request: Request) {
       console.error('Error fetching weekly plan recipes:', recipesError);
     }
 
-    const dayMap = {
+    const dayMap: WeeklyPlanMap = {
       Mon: { breakfast: [], lunch: [], dinner: [] },
       Tue: { breakfast: [], lunch: [], dinner: [] },
       Wed: { breakfast: [], lunch: [], dinner: [] },
@@ -82,17 +92,15 @@ export async function GET(request: Request) {
 
           dayDiff = Math.max(0, Math.min(6, dayDiff));
 
-          const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-          const dayName = dayNames[dayDiff];
+          const dayNames: DayName[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          const dayName: DayName = dayNames[dayDiff];
 
-          const mealType =
+          const mealType = 
             recipe.mealType && ['breakfast', 'lunch', 'dinner'].includes(recipe.mealType.toLowerCase())
-              ? recipe.mealType.toLowerCase()
-              : 'dinner';
+              ? recipe.mealType.toLowerCase() as MealType
+              : 'dinner' as MealType;
 
-          if (dayMap[dayName]) {
-            dayMap[dayName][mealType].push(recipe.recipeData || {});
-          }
+          dayMap[dayName][mealType].push(recipe.recipeData || {});
         } catch (err) {
           console.error('Error processing recipe:', err, recipe);
         }
