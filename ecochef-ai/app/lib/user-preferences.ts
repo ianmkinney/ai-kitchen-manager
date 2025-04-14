@@ -57,10 +57,10 @@ export async function saveUserPreferences(preferences: Record<string, unknown>) 
       throw new Error('User must be authenticated to save preferences');
     }
     
-    // Add userId to preferences
+    // Add userid to preferences - use lowercase to match database schema
     const prefsWithUserId = {
       ...preferences,
-      userId: user.id, // Ensure column name matches database schema
+      userid: user.id, // Changed from userId to userid to match database schema
       updatedAt: new Date().toISOString()
     };
     

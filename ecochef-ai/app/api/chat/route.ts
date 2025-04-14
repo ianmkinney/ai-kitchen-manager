@@ -1,55 +1,66 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../lib/env';
-import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
 
-// Initialize Anthropic client
+// Initialize Anthropic client with API key from environment variables
 const anthropic = new Anthropic({
-  apiKey: env.CLAUDE_API_KEY,
+  apiKey: env.getAnthropicApiKey(),
 });
 
+// Helper function to generate recipe JSON
 const generateRecipeJSON = (recipes: { name: string; ingredients: string[]; instructions: string[] }[]) => {
   return JSON.stringify(recipes, null, 2);
 };
+
+// Get user ID from request headers or use test user ID
+function getUserFromHeaders(request: Request) {
+  // Check headers for user ID and email
+  const userId = request.headers.get('x-user-id');
+  const userEmail = request.headers.get('x-user-email');
+  
+  // If headers are present, use them
+  if (userId && userEmail) {
+    return {
+      id: userId,
+      email: userEmail,
+      role: 'authenticated'
+    };
+  }
+  
+  // Check for test user cookie
+  const cookies = request.headers.get('cookie') || '';
+  const hasTestUserCookie = cookies.includes('test_user=') || 
+                            cookies.includes('ecochef_test_user=');
+  
+  // If test user cookie is present, return test user
+  if (hasTestUserCookie) {
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      email: 'test@ecochef.demo',
+      role: 'authenticated'
+    };
+  }
+  
+  // No user found
+  return null;
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { message } = body;
     const preferences = body.preferences || {};
+    const pantryItems = body.pantryItems || [];
     
-    // Get user from our helper
-    const user = await getCurrentUser();
+    // Get user from request headers or cookies
+    const user = getUserFromHeaders(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Create server client with our helper
-    const supabase = await createServerClient();
-    
-    // Get pantry items from Supabase
-    let pantryItemsData: { name: string }[] = [];
-    try {
-      const { data, error } = await supabase
-        .from('pantry_items')
-        .select('name')
-        .eq('user_id', user.id);
-        
-      if (error) {
-        console.error('Error fetching pantry items:', error);
-      } else if (data) {
-        pantryItemsData = data;
-      }
-    } catch (err) {
-      console.error('Exception fetching pantry items:', err);
-    }
-    
-    // Extract pantry item names
-    const pantryItemNames = pantryItemsData.map(item => item.name || '').filter(Boolean);
-
     console.log('Chat API received request with message:', message);
     console.log('Chat API received preferences:', preferences);
-    console.log('Chat API received pantry items:', pantryItemNames);
+    console.log('Chat API received pantry items:', pantryItems);
 
     if (!message) {
       return NextResponse.json(
@@ -68,19 +79,14 @@ export async function POST(request: Request) {
     }
 
     // Create an enhanced message with detailed preferences and pantry items
-    const pantryItemsText = pantryItemNames.length > 0 
-      ? `Current pantry items: ${pantryItemNames.join(', ')}\n\nMAKE SURE TO USE THESE PANTRY ITEMS IN YOUR RECIPE SUGGESTIONS!`
+    const pantryItemsText = pantryItems.length > 0 
+      ? `Current pantry items: ${pantryItems.join(', ')}\n\nMAKE SURE TO USE THESE PANTRY ITEMS IN YOUR RECIPE SUGGESTIONS!`
       : 'No items currently in pantry.\n';
     
     // Extract cuisine preferences if available
     const cuisinePreferences = Array.isArray(preferences.cuisinePreferences) 
       ? preferences.cuisinePreferences.join(', ')
       : preferences.cuisine || 'Any';
-      
-    // Extract flavor preferences if available
-    const flavorPreferences = Array.isArray(preferences.flavorPreferences) 
-      ? preferences.flavorPreferences.join(', ')
-      : 'No specific flavor preferences';
 
     const enhancedMessage = `
       USER QUERY: "${userQuery}"
@@ -92,12 +98,9 @@ export async function POST(request: Request) {
       - ${preferences.isVegan ? 'Is Vegan' : 'Not Vegan'}
       - ${preferences.isGlutenFree ? 'Needs Gluten-Free options' : 'Can eat gluten'}
       - ${preferences.isDairyFree ? 'Needs Dairy-Free options' : 'Can consume dairy'}
-      - ${preferences.isNutFree ? 'Needs Nut-Free options' : 'Can eat nuts'}
       - Preferred cuisines: ${cuisinePreferences}
-      - Flavor preferences: ${flavorPreferences}
       - Cooking for: ${preferences.peopleCount || 2} people
       - Maximum cooking time: ${preferences.maxCookingTime || 60} minutes
-      - Cooking skill level: ${preferences.cookingSkillLevel || 'intermediate'}
       
       ${pantryItemsText}
       
@@ -187,7 +190,7 @@ export async function POST(request: Request) {
         const fallbackRecipes = [
           {
             name: `${userQuery.includes('chicken') ? 'Herb Roasted Chicken' : userQuery.includes('vegetarian') ? 'Vegetable Stir Fry' : 'Simple Pasta Dish'}`,
-            ingredients: pantryItemNames.slice(0, 3).concat([
+            ingredients: pantryItems.slice(0, 3).concat([
               "Other ingredients based on preferences",
               "Seasonings and spices"
             ]),
@@ -199,7 +202,7 @@ export async function POST(request: Request) {
           },
           {
             name: `${userQuery.includes('fish') ? 'Lemon Garlic Fish' : userQuery.includes('vegan') ? 'Bean and Vegetable Bowl' : 'Quick Stir Fry'}`,
-            ingredients: pantryItemNames.slice(0, 3).concat([
+            ingredients: pantryItems.slice(0, 3).concat([
               "Supporting ingredients",
               "Seasonings and oils"
             ]),
@@ -226,7 +229,7 @@ export async function POST(request: Request) {
         const fallbackRecipes = [
           {
             name: `${userQuery.includes('chicken') ? 'Herb Roasted Chicken' : userQuery.includes('vegetarian') ? 'Vegetable Stir Fry' : 'Simple Pasta Dish'}`,
-            ingredients: pantryItemNames.slice(0, 3).concat([
+            ingredients: pantryItems.slice(0, 3).concat([
               "Other ingredients based on preferences",
               "Seasonings and spices"
             ]),
@@ -238,7 +241,7 @@ export async function POST(request: Request) {
           },
           {
             name: `${userQuery.includes('fish') ? 'Lemon Garlic Fish' : userQuery.includes('vegan') ? 'Bean and Vegetable Bowl' : 'Quick Stir Fry'}`,
-            ingredients: pantryItemNames.slice(0, 3).concat([
+            ingredients: pantryItems.slice(0, 3).concat([
               "Supporting ingredients",
               "Seasonings and oils"
             ]),

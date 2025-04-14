@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { createBrowserClient } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 
 // Define interfaces for our data structure
@@ -32,7 +31,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch user preferences from Supabase
+    // Fetch user preferences from API
     const fetchUserPreferences = async () => {
       setIsLoading(true);
       setError(null);
@@ -44,49 +43,55 @@ export default function ProfilePage() {
       }
       
       try {
-        const supabase = createBrowserClient();
+        // Use the API endpoint instead of directly querying Supabase
+        // This handles test users correctly via the server-side cookies
+        const response = await fetch('/api/preferences');
         
-        const { data, error } = await supabase
-          .from('user_preferences')
-          .select('*')
-          .eq('userid', user.id)
-          .single();
-
-        if (error) {
-          // Handle common database errors
-          if (error.code === '42P01') {
-            setError('Database tables not initialized yet. Please run the Supabase setup script.');
+        if (!response.ok) {
+          // Handle HTTP errors
+          if (response.status === 401) {
+            setError('You are not authorized to view these preferences');
+            setIsLoading(false);
             return;
           }
           
-          // Not found error is ok for new users
-          if (error.code === 'PGRST116') {
+          if (response.status === 404) {
             setError('No preferences found. Please complete the dietary quiz first.');
             setIsLoading(false);
             return;
           }
-
-          throw error;
+          
+          throw new Error(`API error: ${response.status}`);
         }
+        
+        const result = await response.json();
+        
+        if (!result.preferences) {
+          setError('No preferences found. Please complete the dietary quiz first.');
+          setIsLoading(false);
+          return;
+        }
+        
+        const data = result.preferences;
 
-        // Map the database response to our interface with camelCase properties
+        // Map the database response to our interface with the correct property names
         const mappedPreferences: UserPreferences = {
-          isVegetarian: data.isvegetarian,
-          isVegan: data.isvegan,
-          isGlutenFree: data.isglutenfree,
-          isDairyFree: data.isdairyfree,
-          isNutFree: data.isnutfree,
-          maxCookingTime: data.maxcookingtime,
-          cookingSkillLevel: data.cookingskilllevel,
-          peopleCount: data.peoplecount,
-          preferredCuisines: data.preferredcuisines || [],
-          dietGoals: data.dietgoals || [],
+          isVegetarian: data.isVegetarian || false,
+          isVegan: data.isVegan || false,
+          isGlutenFree: data.isGlutenFree || false,
+          isDairyFree: data.isDairyFree || false,
+          isNutFree: data.isNutFree || false,
+          maxCookingTime: data.maxCookingTime || 30,
+          cookingSkillLevel: data.cookingSkillLevel || 'intermediate',
+          peopleCount: data.peopleCount || 1,
+          preferredCuisines: data.cuisinePreferences || [],
+          dietGoals: data.healthGoals || [],
           allergies: data.allergies || [],
-          spicyPreference: data.spicypreference,
-          sweetPreference: data.sweetpreference,
-          savoryPreference: data.savorypreference,
-          createdAt: data.createdat,
-          updatedAt: data.updatedat
+          spicyPreference: data.spicyPreference || 5,
+          sweetPreference: data.sweetPreference || 5, 
+          savoryPreference: data.savoryPreference || 5,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString()
         };
 
         setPreferences(mappedPreferences);

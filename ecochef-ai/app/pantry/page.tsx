@@ -7,8 +7,8 @@ import { supabase } from '../lib/supabase';
 // Define pantry item interface
 interface PantryItem {
   id: string;
-  name: string;
-  userId: string;
+  itemName: string;
+  userid: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,7 +42,7 @@ export default function Pantry() {
       const { data, error } = await supabase
         .from('pantry_items')
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('"createdAt"', { ascending: false });
 
       // Handle common database errors
       if (error) {
@@ -108,7 +108,7 @@ export default function Pantry() {
   const removePantryItem = async (itemName: string) => {
     try {
       // Find the item ID based on name
-      const item = pantryItems.find(item => item.name === itemName);
+      const item = pantryItems.find(item => item.itemName === itemName);
       if (!item) {
         console.error('Item not found:', itemName);
         return;
@@ -140,7 +140,7 @@ export default function Pantry() {
     
     try {
       // Extract names from pantry items
-      const pantryNames = pantryItems.map(item => item.name);
+      const pantryNames = pantryItems.map(item => item.itemName);
       
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -248,9 +248,9 @@ export default function Pantry() {
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {pantryItems.map((item) => (
                 <li key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                  <span>{item.name}</span>
+                  <span>{item.itemName}</span>
                   <button 
-                    onClick={() => removePantryItem(item.name)}
+                    onClick={() => removePantryItem(item.itemName)}
                     className="text-red-500 hover:text-red-700"
                   >
                     Remove

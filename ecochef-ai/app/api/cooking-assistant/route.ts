@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../lib/env';
 
-// Initialize Anthropic client
+// Initialize Anthropic client with fallback between key options
 const anthropic = new Anthropic({
-  apiKey: env.CLAUDE_API_KEY,
+  apiKey: env.getAnthropicApiKey(),
 });
 
 export async function POST(request: Request) {
@@ -78,4 +78,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

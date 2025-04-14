@@ -16,9 +16,25 @@ interface UserPreferences {
   isVegan: boolean;
   isGlutenFree: boolean;
   isDairyFree: boolean;
-  cuisine: string;
-  peopleCount: number;
+  isNutFree: boolean;
+  spicyPreference?: number;
+  sweetPreference?: number;
+  savoryPreference?: number;
   maxCookingTime: number;
+  cookingSkillLevel?: string;
+  peopleCount: number;
+  cuisine: string;
+  cuisinePreferences?: string[];
+  flavorPreferences?: string[];
+  healthGoals?: string[];
+  allergies?: string[];
+  sustainabilityPreference?: string;
+  nutritionFocus?: string[];
+  calorieTarget?: number;
+  proteinTarget?: number;
+  carbTarget?: number;
+  fatTarget?: number;
+  rawQuizAnswers?: Record<string, unknown>;
 }
 
 interface Recipe {
@@ -63,7 +79,7 @@ function DraggableRecipe({ recipe }: { recipe: Recipe }) {
 
   return (
     <div
-      ref={drag as unknown as React.Ref<HTMLDivElement>}
+      ref={drag as unknown as React.RefObject<HTMLDivElement>}
       className={`card p-2 ${isDragging ? 'opacity-50' : ''}`}
       style={{ cursor: 'move' }}
       onClick={handleClick}
@@ -98,7 +114,7 @@ function DroppableMealTime({
 
   return (
     <div
-      ref={drop as unknown as React.Ref<HTMLDivElement>}
+      ref={drop as unknown as React.RefObject<HTMLDivElement>}
       className={`p-3 bg-gray-50 rounded-lg ${isOver ? 'bg-green-100' : ''}`}
     >
       <h4 className="font-medium text-sm mb-2 capitalize">{mealTime}</h4>
@@ -151,15 +167,19 @@ export default function MealPlanning() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   
+  // Add specific loading state for weekly plan
+  const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  
   // State for user preferences
   const [preferences, setPreferences] = useState<UserPreferences>({
     isVegetarian: false,
     isVegan: false,
     isGlutenFree: false,
     isDairyFree: false,
-    cuisine: 'Any',
+    isNutFree: false,
+    maxCookingTime: 30,
     peopleCount: 2,
-    maxCookingTime: 30
+    cuisine: 'Any',
   });
 
   // Initialize the weekly plan with empty arrays for each meal type
@@ -181,132 +201,216 @@ export default function MealPlanning() {
   
   // Load saved preferences, weekly plan and pantry items on component mount
   useEffect(() => {
-    const fetchPreferences = async () => {
+    // Create a flag to track if component is mounted
+    let isMounted = true;
+    
+    const fetchAllData = async () => {
+      // Set loading state
+      if (isMounted) setIsLoading(true);
+      
       try {
-        const response = await fetch('/api/preferences');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.preferences) {
-            setPreferences({
-              isVegetarian: data.preferences.isVegetarian || false,
-              isVegan: data.preferences.isVegan || false,
-              isGlutenFree: data.preferences.isGlutenFree || false,
-              isDairyFree: data.preferences.isDairyFree || false,
-              cuisine: data.preferences.cuisine || 'Any',
-              peopleCount: data.preferences.peopleCount || 2,
-              maxCookingTime: data.preferences.maxCookingTime || 30
-            });
-          } else {
-            // If preferences is null or undefined, set default preferences
-            console.log('No preferences found, using defaults');
-            setPreferences({
-              isVegetarian: false,
-              isVegan: false,
-              isGlutenFree: false,
-              isDairyFree: false,
-              cuisine: 'Any',
-              peopleCount: 2,
-              maxCookingTime: 30
-            });
-          }
+        // Run all data fetching in parallel
+        await Promise.all([
+          fetchPreferences(),
+          fetchWeeklyPlan(),
+          fetchPantryItems()
+        ]);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        // Clear loading state
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    
+    fetchAllData();
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+  
+  const fetchPreferences = async () => {
+    try {
+      const response = await fetch('/api/preferences');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.preferences) {
+          setPreferences({
+            isVegetarian: data.preferences.isVegetarian || false,
+            isVegan: data.preferences.isVegan || false,
+            isGlutenFree: data.preferences.isGlutenFree || false,
+            isDairyFree: data.preferences.isDairyFree || false,
+            isNutFree: data.preferences.isNutFree || false,
+            spicyPreference: data.preferences.spicyPreference,
+            sweetPreference: data.preferences.sweetPreference,
+            savoryPreference: data.preferences.savoryPreference,
+            maxCookingTime: data.preferences.maxCookingTime || 30,
+            cookingSkillLevel: data.preferences.cookingSkillLevel,
+            peopleCount: data.preferences.peopleCount || 2,
+            cuisine: data.preferences.cuisine || 'Any',
+            cuisinePreferences: data.preferences.cuisinePreferences,
+            flavorPreferences: data.preferences.flavorPreferences,
+            healthGoals: data.preferences.healthGoals,
+            allergies: data.preferences.allergies,
+            sustainabilityPreference: data.preferences.sustainabilityPreference,
+            nutritionFocus: data.preferences.nutritionFocus,
+            calorieTarget: data.preferences.calorieTarget,
+            proteinTarget: data.preferences.proteinTarget,
+            carbTarget: data.preferences.carbTarget,
+            fatTarget: data.preferences.fatTarget,
+            rawQuizAnswers: data.preferences.rawQuizAnswers,
+          });
         } else {
-          console.error('Error response from preferences API:', response.status);
-          // In case of error response, still set default preferences
+          // If preferences is null or undefined, set default preferences
+          console.log('No preferences found, using defaults');
           setPreferences({
             isVegetarian: false,
             isVegan: false,
             isGlutenFree: false,
             isDairyFree: false,
-            cuisine: 'Any',
+            isNutFree: false,
+            maxCookingTime: 30,
             peopleCount: 2,
-            maxCookingTime: 30
+            cuisine: 'Any',
           });
         }
-      } catch (error) {
-        console.error('Error fetching preferences:', error);
-        // Always ensure we have default preferences even if API call fails
+      } else {
+        console.error('Error response from preferences API:', response.status);
+        // In case of error response, still set default preferences
         setPreferences({
           isVegetarian: false,
           isVegan: false,
           isGlutenFree: false,
           isDairyFree: false,
-          cuisine: 'Any',
+          isNutFree: false,
+          maxCookingTime: 30,
           peopleCount: 2,
-          maxCookingTime: 30
+          cuisine: 'Any',
         });
       }
-    };
+    } catch (error) {
+      console.error('Error fetching preferences:', error);
+      // Always ensure we have default preferences even if API call fails
+      setPreferences({
+        isVegetarian: false,
+        isVegan: false,
+        isGlutenFree: false,
+        isDairyFree: false,
+        isNutFree: false,
+        maxCookingTime: 30,
+        peopleCount: 2,
+        cuisine: 'Any',
+      });
+    }
+  };
 
-    const fetchWeeklyPlan = async () => {
-      try {
-        console.log('Fetching weekly plan...');
-        const response = await fetch('/api/weekly-plan');
+  const fetchWeeklyPlan = async () => {
+    try {
+      console.log('Fetching weekly plan...');
+      setIsLoadingPlan(true);
+      const response = await fetch('/api/weekly-plan');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Weekly plan API response:', data);
         
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Weekly plan API response:', data);
+        if (data.weeklyPlan) {
+          // Ensure the weekly plan has the expected structure with meal times
+          const plan = data.weeklyPlan;
           
-          if (data.weeklyPlan) {
-            // Ensure the weekly plan has the expected structure with meal times
-            const plan = data.weeklyPlan;
-            
-            setWeeklyPlan(prevPlan => {
-              const newPlan = { ...prevPlan };
+          // Create a new blank weekly plan to start with
+          const newPlan: WeeklyPlan = {
+            Mon: { breakfast: [], lunch: [], dinner: [] },
+            Tue: { breakfast: [], lunch: [], dinner: [] },
+            Wed: { breakfast: [], lunch: [], dinner: [] },
+            Thu: { breakfast: [], lunch: [], dinner: [] },
+            Fri: { breakfast: [], lunch: [], dinner: [] },
+            Sat: { breakfast: [], lunch: [], dinner: [] },
+            Sun: { breakfast: [], lunch: [], dinner: [] },
+          };
+          
+          // Copy each day's meals from the saved plan
+          ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => {
+            // Check if this day exists in the returned plan
+            if (plan[day]) {
+              // Add each meal time's recipes, ensuring they're valid Recipe objects
+              const validMealTypes: MealTime[] = ['breakfast', 'lunch', 'dinner'];
               
-              // Copy each day's meals from the saved plan
-              ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => {
-                // Check if this day exists in the returned plan
-                if (plan[day]) {
-                  // Ensure each meal time exists with proper arrays
-                  newPlan[day] = {
-                    breakfast: Array.isArray(plan[day].breakfast) ? plan[day].breakfast : [],
-                    lunch: Array.isArray(plan[day].lunch) ? plan[day].lunch : [],
-                    dinner: Array.isArray(plan[day].dinner) ? plan[day].dinner : []
-                  };
+              validMealTypes.forEach(mealType => {
+                if (Array.isArray(plan[day][mealType])) {
+                  newPlan[day][mealType] = plan[day][mealType].map((recipe: Partial<Recipe>) => {
+                    return {
+                      name: recipe.name || 'Unnamed Recipe',
+                      ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+                      instructions: Array.isArray(recipe.instructions) ? recipe.instructions : []
+                    };
+                  });
                 }
               });
-              
-              console.log('Updated weekly plan state:', newPlan);
-              return newPlan;
-            });
-          } else {
-            console.log('No weekly plan data returned from API');
-          }
+            }
+          });
+          
+          console.log('Updated weekly plan state:', newPlan);
+          setWeeklyPlan(newPlan);
         } else {
-          console.error('Error response from weekly plan API:', response.status);
-          const errorText = await response.text();
-          console.error('API error details:', errorText);
+          console.log('No weekly plan data returned from API');
         }
-      } catch (error) {
-        console.error('Error fetching weekly plan:', error);
+      } else {
+        console.error('Error response from weekly plan API:', response.status);
+        const errorText = await response.text();
+        console.error('API error details:', errorText);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching weekly plan:', error);
+    } finally {
+      setIsLoadingPlan(false);
+    }
+  };
 
-    const fetchPantryItems = async () => {
-      try {
-        const response = await fetch('/api/pantry');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.pantryItems && Array.isArray(data.pantryItems)) {
-            // Extract names from pantry items
-            const items = data.pantryItems.map((item: { name: string }) => item.name || '').filter(Boolean);
-            setPantryItems(items);
-          }
+  const fetchPantryItems = async () => {
+    try {
+      const response = await fetch('/api/pantry');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.pantryItems && Array.isArray(data.pantryItems)) {
+          // Extract names from pantry items - check both itemName (API standard) and name (local fallback)
+          const items = data.pantryItems.map((item: {itemName?: string, name?: string}) => 
+            item.itemName || item.name || ''
+          ).filter(Boolean);
+          
+          console.log('Fetched pantry items:', items);
+          setPantryItems(items);
+        } else {
+          console.warn('No pantry items found or unexpected format:', data);
+          setPantryItems([]);
         }
-      } catch (error) {
-        console.error('Error fetching pantry items:', error);
+      } else {
+        console.error('Error response from pantry API:', response.status);
+        setPantryItems([]);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching pantry items:', error);
+      setPantryItems([]);
+    }
+  };
 
-    fetchPreferences();
-    fetchWeeklyPlan();
-    fetchPantryItems();
-  }, []);
-  
   // Handle preference changes
   const handlePreferenceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const target = e.target;
-    const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
+    let value: string | number | boolean;
+    
+    // Handle different input types
+    if (target.type === 'checkbox') {
+      value = (target as HTMLInputElement).checked;
+    } else if (target.type === 'range') {
+      // Convert range values to numbers
+      value = parseInt(target.value, 10);
+    } else {
+      value = target.value;
+    }
+    
     const name = target.name;
     
     setPreferences(prev => ({
@@ -320,18 +424,21 @@ export default function MealPlanning() {
     e.preventDefault();
     
     try {
+      // Format preferences to match what the API expects
       const response = await fetch('/api/preferences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ preferences })
+        body: JSON.stringify(preferences) // Send preferences directly, not wrapped in an object
       });
       
       if (response.ok) {
         alert('Preferences saved successfully!');
       } else {
-        alert('Failed to save preferences');
+        const errorData = await response.json();
+        console.error('Error response from API:', errorData);
+        alert(`Failed to save preferences: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error saving preferences:', error);
@@ -370,7 +477,8 @@ export default function MealPlanning() {
         const pantryData = await pantryResponse.json();
         if (pantryData.pantryItems && Array.isArray(pantryData.pantryItems)) {
           // Extract names from pantry items
-          pantryItems = pantryData.pantryItems.map((item: { name: string }) => item.name || '').filter(Boolean);
+          pantryItems = pantryData.pantryItems.map((item: {itemName?: string, name?: string}) => 
+            item.itemName || item.name || '').filter(Boolean);
         }
       } else {
         console.warn('Failed to fetch pantry items');
@@ -589,7 +697,9 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
         mealDate.setDate(weekStartDate.getDate() + dayOffset);
         
         for (const [mealType, mealRecipes] of Object.entries(meals)) {
-          for (const recipe of mealRecipes) {
+          // Cast the mealRecipes to Recipe[] to fix type issues
+          const typedRecipes = mealRecipes as Recipe[];
+          for (const recipe of typedRecipes) {
             recipes.push({
               recipeData: recipe,
               plannedDate: mealDate.toISOString().split('T')[0], // YYYY-MM-DD format
@@ -609,13 +719,64 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          weekStartDate: weekStartDate.toISOString().split('T')[0],
-          recipes: recipes
+          weeklyPlan: {
+            weekStartDate: weekStartDate.toISOString().split('T')[0],
+            recipes: recipes
+          }
         }),
       });
 
       if (response.ok) {
         alert('Weekly plan saved successfully!');
+        
+        // Reload the weekly plan data to show the latest saved version
+        try {
+          console.log('Refreshing weekly plan data...');
+          const refreshResponse = await fetch('/api/weekly-plan');
+          
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            if (refreshData.weeklyPlan) {
+              // Process and update the UI with the latest data
+              const plan = refreshData.weeklyPlan;
+              
+              // Create a new plan to hold the updated data
+              const newPlan: WeeklyPlan = {
+                Mon: { breakfast: [], lunch: [], dinner: [] },
+                Tue: { breakfast: [], lunch: [], dinner: [] },
+                Wed: { breakfast: [], lunch: [], dinner: [] },
+                Thu: { breakfast: [], lunch: [], dinner: [] },
+                Fri: { breakfast: [], lunch: [], dinner: [] },
+                Sat: { breakfast: [], lunch: [], dinner: [] },
+                Sun: { breakfast: [], lunch: [], dinner: [] },
+              };
+              
+              // Populate the plan with the returned data
+              ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => {
+                if (plan[day]) {
+                  const validMealTypes: MealTime[] = ['breakfast', 'lunch', 'dinner'];
+                  
+                  validMealTypes.forEach(mealType => {
+                    if (Array.isArray(plan[day][mealType])) {
+                      newPlan[day][mealType] = plan[day][mealType].map((recipe: Partial<Recipe>) => {
+                        return {
+                          name: recipe.name || 'Unnamed Recipe',
+                          ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+                          instructions: Array.isArray(recipe.instructions) ? recipe.instructions : []
+                        };
+                      });
+                    }
+                  });
+                }
+              });
+              
+              setWeeklyPlan(newPlan);
+              console.log('Weekly plan refreshed successfully');
+            }
+          }
+        } catch (refreshError) {
+          console.error('Error refreshing weekly plan:', refreshError);
+        }
       } else {
         const errorData = await response.json();
         console.error('Failed to save weekly plan:', errorData);
@@ -764,12 +925,13 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
           <section className="card">
             <h2 className="text-xl font-semibold mb-4">Your Preferences</h2>
             <form className="space-y-4" onSubmit={savePreferences}>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Dietary Restrictions */}
                 <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1">
                     Dietary Restrictions
                   </label>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <label className="flex items-center">
                       <input
                         type="checkbox"
@@ -810,9 +972,20 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
                       />
                       Dairy-Free
                     </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="isNutFree"
+                        checked={preferences.isNutFree}
+                        onChange={handlePreferenceChange}
+                        className="mr-2"
+                      />
+                      Nut-Free
+                    </label>
                   </div>
                 </div>
                 
+                {/* Cooking Options */}
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Cooking Time (minutes)
@@ -847,7 +1020,7 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
                   </select>
                 </div>
                 
-                <div className="col-span-2">
+                <div>
                   <label className="block text-sm font-medium mb-1">
                     Cuisine Preference
                   </label>
@@ -865,6 +1038,87 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
                     <option value="Indian">Indian</option>
                     <option value="American">American</option>
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Cooking Skill Level
+                  </label>
+                  <select 
+                    name="cookingSkillLevel"
+                    className="input-field"
+                    value={preferences.cookingSkillLevel || 'intermediate'}
+                    onChange={handlePreferenceChange}
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+                
+                {/* Taste Preference Sliders */}
+                <div className="col-span-2">
+                  <h3 className="block text-sm font-medium mb-2">Taste Preferences (0-10)</h3>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm">Spicy: {preferences.spicyPreference || 5}</label>
+                    </div>
+                    <input
+                      type="range"
+                      name="spicyPreference"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={preferences.spicyPreference || 5}
+                      onChange={handlePreferenceChange}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Not Spicy</span>
+                      <span>Very Spicy</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm">Sweet: {preferences.sweetPreference || 5}</label>
+                    </div>
+                    <input
+                      type="range"
+                      name="sweetPreference"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={preferences.sweetPreference || 5}
+                      onChange={handlePreferenceChange}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Not Sweet</span>
+                      <span>Very Sweet</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm">Savory: {preferences.savoryPreference || 5}</label>
+                    </div>
+                    <input
+                      type="range"
+                      name="savoryPreference"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={preferences.savoryPreference || 5}
+                      onChange={handlePreferenceChange}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Less Savory</span>
+                      <span>Very Savory</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               <button type="submit" className="btn-primary w-full">
@@ -931,7 +1185,13 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
 
         {/* Weekly Plan Section */}
         <section className="mt-8 card">
-          <h2 className="text-xl font-semibold mb-4">Your Weekly Plan</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Your Weekly Plan</h2>
+            {isLoadingPlan && (
+              <span className="text-sm text-blue-500">Loading your saved plan...</span>
+            )}
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
             {Object.keys(weeklyPlan).map((day) => (
               <DroppableDay

@@ -4,9 +4,9 @@ import { createServerClient, getCurrentUser } from '../../../lib/supabase-server
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../../lib/env';
 
-// Initialize Anthropic client
+// Initialize Anthropic client with fallback between key options
 const anthropic = new Anthropic({
-  apiKey: env.CLAUDE_API_KEY,
+  apiKey: env.getAnthropicApiKey(),
 });
 
 export async function GET() {
@@ -32,7 +32,7 @@ export async function GET() {
     const { data: pantryItems, error } = await supabase
       .from('pantry_items')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('userid', user.id);
       
     if (error) {
       console.error('Error fetching pantry items:', error);
@@ -43,8 +43,8 @@ export async function GET() {
     }
     
     // Format pantry items for Claude
-    const pantryItemsText = pantryItems.map((item: { name: string }) => 
-      `${item.name}`
+    const pantryItemsText = pantryItems.map((item: { itemName: string }) => 
+      `${item.itemName}`
     ).join('\n');
     
     // Prepare preferences text
