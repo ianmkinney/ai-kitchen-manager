@@ -27,8 +27,12 @@ export default function Login() {
       } else {
         throw new Error('Invalid email or password');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to login');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error(err.message);
+      } else {
+        console.error('An unknown error occurred.');
+      }
     } finally {
       setLoading(false);
     }
@@ -91,4 +95,4 @@ export default function Login() {
       </div>
     </div>
   );
-} 
+}

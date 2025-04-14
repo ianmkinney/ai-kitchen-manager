@@ -45,7 +45,7 @@ export async function getUserPreferences() {
 }
 
 // Save user preferences - requires the user to be authenticated
-export async function saveUserPreferences(preferences: any) {
+export async function saveUserPreferences(preferences: Record<string, unknown>) {
   try {
     const supabase = getSupabaseClient();
     

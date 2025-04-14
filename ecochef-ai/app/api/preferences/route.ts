@@ -16,7 +16,7 @@ async function getUserIdFromAuthUsers(email: string) {
   return data.id;
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const supabase = await createServerClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();

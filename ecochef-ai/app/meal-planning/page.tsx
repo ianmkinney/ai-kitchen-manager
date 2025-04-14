@@ -289,7 +289,7 @@ export default function MealPlanning() {
           const data = await response.json();
           if (data.pantryItems && Array.isArray(data.pantryItems)) {
             // Extract names from pantry items
-            const items = data.pantryItems.map((item: any) => item.name || '').filter(Boolean);
+            const items = data.pantryItems.map((item: { name: string }) => item.name || '').filter(Boolean);
             setPantryItems(items);
           }
         }
@@ -370,7 +370,7 @@ export default function MealPlanning() {
         const pantryData = await pantryResponse.json();
         if (pantryData.pantryItems && Array.isArray(pantryData.pantryItems)) {
           // Extract names from pantry items
-          pantryItems = pantryData.pantryItems.map((item: any) => item.name || '').filter(Boolean);
+          pantryItems = pantryData.pantryItems.map((item: { name: string }) => item.name || '').filter(Boolean);
         }
       } else {
         console.warn('Failed to fetch pantry items');

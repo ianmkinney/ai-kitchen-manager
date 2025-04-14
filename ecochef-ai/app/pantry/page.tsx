@@ -13,19 +13,6 @@ interface PantryItem {
   updatedAt: string;
 }
 
-// Define a type for shopping items
-interface ShoppingItem {
-  id: string;
-  name: string;
-  isChecked: boolean;
-}
-
-// Define the ShoppingSuggestion type
-interface ShoppingSuggestion {
-  name: string;
-  category: string;
-}
-
 // Define recipe interface
 interface Recipe {
   name: string;
@@ -40,8 +27,6 @@ export default function Pantry() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newPantryItem, setNewPantryItem] = useState('');
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
-  const [newShoppingItem, setNewShoppingItem] = useState('');
   const [recipes, setRecipes] = useState<Recipe[]>([]); // Add state for recipes
 
   // Load pantry items on component mount

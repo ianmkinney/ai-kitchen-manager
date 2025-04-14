@@ -23,62 +23,6 @@ interface UserPreferences {
   [key: string]: boolean | number | string | string[] | undefined;
 }
 
-// Add fallback suggestions for when the API is slow
-const getFallbackSuggestions = (preferences: unknown, pantryItems: string[] = []) => {
-  // Type assertion to work with the preferences
-  const prefs = preferences as UserPreferences;
-  
-  // Check dietary restrictions and return appropriate fallback suggestions
-  const isVegetarian = prefs.isVegetarian;
-  const isVegan = prefs.isVegan;
-  
-  const pantryItemsList = pantryItems.length > 0 ? `Based on your pantry items (${pantryItems.join(', ')}), ` : '';
-  
-  let suggestions = `${pantryItemsList}Here are some shopping suggestions and meal ideas based on your preferences:\n\n`;
-  
-  if (isVegan) {
-    suggestions += "Shopping List Suggestions:\n";
-    suggestions += "1. Tofu or tempeh for protein\n";
-    suggestions += "2. Nutritional yeast for cheesy flavor\n";
-    suggestions += "3. Canned beans for quick meals\n";
-    suggestions += "4. Fresh seasonal vegetables\n";
-    suggestions += "5. Plant-based milk\n\n";
-    
-    suggestions += "Meal Ideas:\n";
-    suggestions += "1. Chickpea and vegetable curry with brown rice\n";
-    suggestions += "2. Lentil and vegetable soup with a side salad\n";
-    suggestions += "3. Quinoa bowl with roasted vegetables and tahini dressing\n\n";
-  } else if (isVegetarian) {
-    suggestions += "Shopping List Suggestions:\n";
-    suggestions += "1. Eggs for quick protein\n";
-    suggestions += "2. Greek yogurt\n";
-    suggestions += "3. Various cheeses\n";
-    suggestions += "4. Fresh seasonal vegetables\n";
-    suggestions += "5. Nuts and seeds\n\n";
-    
-    suggestions += "Meal Ideas:\n";
-    suggestions += "1. Greek yogurt parfait with berries and granola\n";
-    suggestions += "2. Spinach and feta omelet with whole grain toast\n";
-    suggestions += "3. Caprese salad with crusty bread\n\n";
-  } else {
-    suggestions += "Shopping List Suggestions:\n";
-    suggestions += "1. Chicken breasts or thighs\n";
-    suggestions += "2. Ground turkey\n";
-    suggestions += "3. Fish (salmon or white fish)\n";
-    suggestions += "4. Fresh seasonal vegetables\n";
-    suggestions += "5. Whole grains like quinoa or brown rice\n\n";
-    
-    suggestions += "Meal Ideas:\n";
-    suggestions += "1. Grilled chicken with roasted vegetables\n";
-    suggestions += "2. Salmon with quinoa and steamed broccoli\n";
-    suggestions += "3. Turkey and vegetable stir-fry with brown rice\n\n";
-  }
-  
-  suggestions += "Nutrition Advice: Focus on whole foods, plenty of vegetables, lean proteins, and whole grains. Stay hydrated and try to limit processed foods.";
-  
-  return suggestions;
-};
-
 const generateRecipeJSON = (recipes: { name: string; ingredients: string[]; instructions: string[] }[]) => {
   return JSON.stringify(recipes, null, 2);
 };
