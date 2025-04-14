@@ -971,7 +971,7 @@ The recipes should USE THE INGREDIENTS FROM THE USER'S PANTRY WHENEVER POSSIBLE:
                 <>
                   <div className="mb-4">
                     <p className="text-sm text-gray-600">
-                      These items aren't in your pantry but are needed for your weekly plan:
+                      These items aren&apos;t in your pantry but are needed for your weekly plan:
                     </p>
                   </div>
                   

@@ -8,21 +8,6 @@ const anthropic = new Anthropic({
   apiKey: env.CLAUDE_API_KEY,
 });
 
-// Add a proper interface for the preferences
-interface UserPreferences {
-  isVegetarian: boolean;
-  isVegan: boolean;
-  isGlutenFree?: boolean;
-  isDairyFree?: boolean;
-  isNutFree?: boolean;
-  maxCookingTime?: number;
-  cookingSkillLevel?: string;
-  cuisinePreferences?: string[];
-  flavorPreferences?: string[];
-  peopleCount?: number;
-  [key: string]: boolean | number | string | string[] | undefined;
-}
-
 const generateRecipeJSON = (recipes: { name: string; ingredients: string[]; instructions: string[] }[]) => {
   return JSON.stringify(recipes, null, 2);
 };
