@@ -35,7 +35,6 @@ interface Recipe {
 
 export default function Pantry() {
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  const [newItem, setNewItem] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [aiSuggestions, setAiSuggestions] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -43,9 +42,6 @@ export default function Pantry() {
   const [newPantryItem, setNewPantryItem] = useState('');
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
   const [newShoppingItem, setNewShoppingItem] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [recipes, setRecipes] = useState<Recipe[]>([]); // Add state for recipes
 
   // Load pantry items on component mount
@@ -185,115 +181,6 @@ export default function Pantry() {
       setAiSuggestions('Sorry, there was an error getting suggestions. Please try again later.');
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  // Add item to shopping list
-  const addShoppingItem = async () => {
-    if (!newShoppingItem.trim()) return;
-    
-    try {
-      const res = await fetch('/api/shopping', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newShoppingItem,
-          category: 'Other'
-        }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setShoppingItems([...shoppingItems, data.shoppingItem]);
-        setNewShoppingItem('');
-      }
-    } catch (error) {
-      console.error('Error adding shopping item:', error);
-    }
-  };
-
-  // Toggle shopping item check status
-  const toggleShoppingItem = async (id: string, isChecked: boolean) => {
-    try {
-      const res = await fetch('/api/shopping', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id,
-          isChecked: !isChecked,
-        }),
-      });
-
-      if (res.ok) {
-        setShoppingItems(
-          shoppingItems.map(item =>
-            item.id === id ? { ...item, isChecked: !isChecked } : item
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Error updating shopping item:', error);
-    }
-  };
-
-  // Remove shopping item
-  const removeShoppingItem = async (id: string) => {
-    try {
-      const res = await fetch(`/api/shopping?id=${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (res.ok) {
-        setShoppingItems(shoppingItems.filter(item => item.id !== id));
-      }
-    } catch (error) {
-      console.error('Error deleting shopping item:', error);
-    }
-  };
-
-  // Get shopping suggestions
-  const getShoppingSuggestions = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/shopping/suggestions');
-      
-      if (res.ok) {
-        const data = await res.json();
-        setSuggestions(data);
-        setShowSuggestions(true);
-      }
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error getting shopping suggestions:', error);
-      setLoading(false);
-    }
-  };
-
-  // Add suggestion to shopping list
-  const addSuggestionToShoppingList = async (suggestion: ShoppingSuggestion) => {
-    try {
-      const res = await fetch('/api/shopping', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: suggestion.name,
-          category: suggestion.category
-        }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setShoppingItems([...shoppingItems, data.shoppingItem]);
-      }
-    } catch (error) {
-      console.error('Error adding suggestion to shopping list:', error);
     }
   };
 

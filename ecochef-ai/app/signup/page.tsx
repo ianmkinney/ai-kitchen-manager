@@ -42,8 +42,12 @@ export default function Signup() {
       } else {
         throw new Error('Failed to create account');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'Failed to create account');
+      } else {
+        setError('Failed to create account');
+      }
     } finally {
       setLoading(false);
     }
@@ -137,4 +141,4 @@ export default function Signup() {
       </div>
     </div>
   );
-} 
+}

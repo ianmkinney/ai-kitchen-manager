@@ -25,42 +25,11 @@ interface UserPreferences {
   updatedAt: string;
 }
 
-// Interface for the database response with lowercase keys
-interface DBUserPreferences {
-  id: string;
-  userid: string;
-  isvegetarian: boolean;
-  isvegan: boolean;
-  isglutenfree: boolean;
-  isdairyfree: boolean;
-  isnutfree: boolean;
-  maxcookingtime: number;
-  cookingskilllevel: string;
-  peoplecount: number;
-  preferredcuisines: string[];
-  dietgoals: string[];
-  allergies: string[];
-  spicypreference: number;
-  sweetpreference: number;
-  savorypreference: number;
-  createdat: string;
-  updatedat: string;
-}
-
 export default function ProfilePage() {
   const { user } = useAuth();
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      fetchUserPreferences();
-    } else {
-      setIsLoading(false);
-      setError('Please log in to view your preferences');
-    }
-  }, [user]);
 
   // Fetch user preferences from Supabase
   const fetchUserPreferences = async () => {
@@ -127,6 +96,15 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchUserPreferences();
+    } else {
+      setIsLoading(false);
+      setError('Please log in to view your preferences');
+    }
+  }, [user, fetchUserPreferences]);
 
   // Helper function to format arrays for display
   const formatArrayForDisplay = (arr: string[] | undefined) => {
@@ -299,4 +277,4 @@ export default function ProfilePage() {
       </div>
     </div>
   );
-} 
+}
