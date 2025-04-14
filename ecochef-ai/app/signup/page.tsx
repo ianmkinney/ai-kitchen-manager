@@ -14,10 +14,12 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -31,22 +33,45 @@ export default function Signup() {
       return;
     }
     
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    
+    // Validate username
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+    
     setLoading(true);
     
     try {
+      setSuccessMessage('Creating your account...');
       const success = await signup(email, password, username);
       
       if (success) {
-        // Redirect to preferences quiz
-        router.push('/preferences/quiz');
+        setSuccessMessage('Account created successfully! Redirecting to preferences setup...');
+        // Small delay before redirect for better UX
+        setTimeout(() => {
+          router.push('/preferences/quiz');
+        }, 1500);
       } else {
-        throw new Error('Failed to create account');
+        throw new Error('Failed to create account. Please try again.');
       }
     } catch (err: unknown) {
+      setSuccessMessage(null);
       if (err instanceof Error) {
-        setError(err.message || 'Failed to create account');
+        // Handle specific error messages from Supabase
+        if (err.message.includes('already registered')) {
+          setError('This email is already registered. Try logging in instead.');
+        } else {
+          setError(err.message || 'Failed to create account. Please try again.');
+        }
       } else {
-        setError('Failed to create account');
+        setError('Failed to create account. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -64,6 +89,12 @@ export default function Signup() {
           </div>
         )}
         
+        {successMessage && (
+          <div className="bg-green-50 text-green-500 p-3 rounded-md mb-6">
+            {successMessage}
+          </div>
+        )}
+        
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-1">
@@ -77,6 +108,7 @@ export default function Signup() {
               className="input-field w-full"
               required
               placeholder="Enter your email"
+              disabled={loading}
             />
           </div>
           
@@ -92,7 +124,9 @@ export default function Signup() {
               className="input-field w-full"
               required
               placeholder="Choose a username"
+              disabled={loading}
             />
+            <p className="text-sm text-gray-500 mt-1">This will be displayed in the app</p>
           </div>
           
           <div>
@@ -107,6 +141,7 @@ export default function Signup() {
               className="input-field w-full"
               required
               placeholder="Choose a password"
+              disabled={loading}
             />
             <p className="text-sm text-gray-500 mt-1">At least 6 characters</p>
           </div>
@@ -123,6 +158,7 @@ export default function Signup() {
               className="input-field w-full"
               required
               placeholder="Confirm your password"
+              disabled={loading}
             />
           </div>
           

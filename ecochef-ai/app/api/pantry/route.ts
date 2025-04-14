@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
+import { getTestUserDataWithAdmin, insertTestUserDataWithAdmin } from '../../lib/admin-check';
 
 // GET - Retrieve all pantry items for the current user
 export async function GET(request: Request) {
@@ -15,15 +16,31 @@ export async function GET(request: Request) {
       );
     }
 
-    // Create server client with our helper
+    // Check if this is a test user and use admin client if needed
+    if (user.id === '00000000-0000-0000-0000-000000000000') {
+      console.log('Using admin client for test user pantry items');
+      const { data, error } = await getTestUserDataWithAdmin('pantry_items');
+      
+      if (error) {
+        console.error('GET /api/pantry: Error fetching test user pantry items:', error);
+        return NextResponse.json(
+          { error: 'Failed to fetch pantry items', details: error },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({ pantryItems: data });
+    }
+
+    // For regular users, create server client with our helper
     const supabase = await createServerClient();
 
     // Get pantry items directly from Supabase
     const { data: pantryItems, error } = await supabase
       .from('pantry_items')
       .select('*')
-      .eq('userId', user.id)
-      .order('createdAt', { ascending: false });
+      .eq('userid', user.id)
+      .order('"createdAt"', { ascending: false });
 
     if (error) {
       console.error('GET /api/pantry: Error fetching pantry items:', error);
@@ -68,23 +85,39 @@ export async function POST(request: Request) {
         { status: 401 }
       );
     }
+    
+    const newItem = {
+      "itemName": body.name,
+      category: body.category || 'Other',
+      quantity: body.quantity || 1,
+      userid: user.id,
+      "createdAt": new Date().toISOString(),
+      "updatedAt": new Date().toISOString()
+    };
 
-    // Create server client with our helper
+    // Check if this is a test user and use admin client if needed
+    if (user.id === '00000000-0000-0000-0000-000000000000') {
+      console.log('Using admin client for adding test user pantry item');
+      const { data, error } = await insertTestUserDataWithAdmin('pantry_items', newItem);
+      
+      if (error) {
+        console.error('POST /api/pantry: Error adding test user pantry item:', error);
+        return NextResponse.json(
+          { error: 'Failed to add pantry item', details: error },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({ pantryItem: data?.[0] || null });
+    }
+
+    // For regular users, create server client with our helper
     const supabase = await createServerClient();
 
     // Insert the new pantry item
     const { data, error } = await supabase
       .from('pantry_items')
-      .insert([
-        {
-          name: body.name,
-          category: body.category || 'Other',
-          quantity: body.quantity || 1,
-          userId: user.id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ])
+      .insert([newItem])
       .select()
       .single();
 
@@ -138,7 +171,7 @@ export async function PUT(request: Request) {
       .from('pantry_items')
       .select('*')
       .eq('id', id)
-      .eq('"userId"', user.id)
+      .eq('userid', user.id) // Changed from "userId" to userid
       .single();
 
     if (findError || !existingItem) {
@@ -152,15 +185,15 @@ export async function PUT(request: Request) {
     const { data: updatedItem, error } = await supabase
       .from('pantry_items')
       .update({
-        name: name !== undefined ? name : existingItem.name,
+        "itemName": name !== undefined ? name : existingItem.name,
         category: category !== undefined ? category : existingItem.category,
         quantity: quantity !== undefined ? quantity : existingItem.quantity,
         unit: unit !== undefined ? unit : existingItem.unit,
-        expiration: expiration ? new Date(expiration).toISOString() : existingItem.expiration,
+        "expirationDate": expiration ? new Date(expiration).toISOString() : existingItem.expiration,
         "updatedAt": new Date().toISOString()
       })
       .eq('id', id)
-      .eq('"userId"', user.id)
+      .eq('userid', user.id)
       .select()
       .single();
 
@@ -214,7 +247,7 @@ export async function DELETE(request: Request) {
       .from('pantry_items')
       .select('id')
       .eq('id', id)
-      .eq('userId', user.id)
+      .eq('userid', user.id) // Changed from userId to userid
       .single();
 
     if (fetchError || !item) {

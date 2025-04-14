@@ -15,19 +15,48 @@ async function main() {
 
   console.log('User created:', demoUser);
 
-  // Create user preferences separately
-  const userPreferences = await prisma.user_preferences.create({
-    data: {
-      userId: demoUser.id, // Link to the user by ID
-      isVegetarian: false,
-      isVegan: false,
-      isGlutenFree: false,
-      isDairyFree: false,
-      maxCookingTime: 60,
-    }
-  });
+  try {
+    // Create user preferences separately
+    // Note: We're using the Prisma raw query to ensure we use the exact column names
+    // from the SQL schema due to the @map directive usage
+    const userPreferences = await prisma.$queryRaw`
+      INSERT INTO "public"."user_preferences" 
+      ("id", "userid", "isVegetarian", "isVegan", "isGlutenFree", "isDairyFree", "maxCookingTime", "peopleCount", "cuisine", "createdAt", "updatedAt") 
+      VALUES 
+      (gen_random_uuid(), ${demoUser.id}, false, false, false, false, 60, 2, 'Any', now(), now())
+      RETURNING *;
+    `;
 
-  console.log('Database seeded with demo user and preferences:', { user: demoUser, preferences: userPreferences });
+    // Create some pantry items for demo user
+    const pantryItems = await Promise.all([
+      prisma.$queryRaw`
+        INSERT INTO "public"."pantry_items"
+        ("id", "userid", "itemName", "category", "quantity", "unit", "createdAt", "updatedAt")
+        VALUES
+        (gen_random_uuid(), ${demoUser.id}, 'Rice', 'Grains', 2, 'kg', now(), now())
+        RETURNING *;
+      `,
+      prisma.$queryRaw`
+        INSERT INTO "public"."pantry_items"
+        ("id", "userid", "itemName", "category", "quantity", "unit", "createdAt", "updatedAt")
+        VALUES
+        (gen_random_uuid(), ${demoUser.id}, 'Chicken', 'Meat', 1, 'kg', now(), now())
+        RETURNING *;
+      `,
+      prisma.$queryRaw`
+        INSERT INTO "public"."pantry_items"
+        ("id", "userid", "itemName", "category", "quantity", "unit", "createdAt", "updatedAt")
+        VALUES
+        (gen_random_uuid(), ${demoUser.id}, 'Tomatoes', 'Vegetables', 5, 'count', now(), now())
+        RETURNING *;
+      `
+    ]);
+
+    console.log('Database seeded with demo user, preferences, and pantry items:', 
+      { user: demoUser, preferences: userPreferences, pantryItems });
+  } catch (error) {
+    console.error('Error creating database records:', error);
+  }
 }
 
 main()

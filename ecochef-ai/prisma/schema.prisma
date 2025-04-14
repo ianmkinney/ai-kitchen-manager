@@ -277,6 +277,7 @@ model sso_providers {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model users {
   instance_id                                     String?            @db.Uuid
@@ -368,15 +369,20 @@ model heartbeat_users {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model pantry_items {
-  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name      String
-  userId    String?   @db.Uuid
-  createdAt DateTime? @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime? @default(now()) @db.Timestamptz(6)
-  users     users?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  itemName       String    @map("\"itemName\"")
+  userid         String    @db.Uuid
+  category       String?
+  quantity       Float?
+  unit           String?
+  expirationDate DateTime? @map("\"expirationDate\"") @db.Date
+  notes          String?
+  createdAt      DateTime? @default(now()) @map("\"createdAt\"") @db.Timestamptz(6)
+  updatedAt      DateTime? @default(now()) @map("\"updatedAt\"") @db.Timestamptz(6)
+  users          users?    @relation(fields: [userid], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([name], map: "idx_pantry_items_name")
-  @@index([userId], map: "idx_pantry_items_user_id")
+  @@index([itemName], map: "idx_pantry_items_name")
+  @@index([userid], map: "idx_pantry_items_user_id")
   @@schema("public")
 }
 
@@ -419,33 +425,34 @@ model responses {
 model user_preferences {
   id                                   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   userid                               String?   @unique @db.Uuid
-  isVegetarian                         Boolean?  @default(false)
-  isVegan                              Boolean?  @default(false)
-  isGlutenFree                         Boolean?  @default(false)
-  isDairyFree                          Boolean?  @default(false)
-  isNutFree                            Boolean?  @default(false)
-  spicyPreference                      Int?      @default(5)
-  sweetPreference                      Int?      @default(5)
-  savoryPreference                     Int?      @default(5)
-  maxCookingTime                       Int?
-  cookingSkillLevel                    String?   @default("intermediate")
-  peopleCount                          Int?      @default(1)
-  cuisinePreferences                   Json?     @default("[]")
-  flavorPreferences                    Json?     @default("[]")
-  healthGoals                          Json?     @default("[]")
+  isVegetarian                         Boolean?  @default(false) @map("\"isVegetarian\"")
+  isVegan                              Boolean?  @default(false) @map("\"isVegan\"")
+  isGlutenFree                         Boolean?  @default(false) @map("\"isGlutenFree\"")
+  isDairyFree                          Boolean?  @default(false) @map("\"isDairyFree\"")
+  isNutFree                            Boolean?  @default(false) @map("\"isNutFree\"")
+  spicyPreference                      Int?      @default(5) @map("\"spicyPreference\"")
+  sweetPreference                      Int?      @default(5) @map("\"sweetPreference\"")
+  savoryPreference                     Int?      @default(5) @map("\"savoryPreference\"")
+  maxCookingTime                       Int?      @map("\"maxCookingTime\"")
+  cookingSkillLevel                    String?   @default("intermediate") @map("\"cookingSkillLevel\"")
+  peopleCount                          Int?      @default(1) @map("\"peopleCount\"")
+  cuisinePreferences                   Json?     @default("[]") @map("\"cuisinePreferences\"")
+  flavorPreferences                    Json?     @default("[]") @map("\"flavorPreferences\"")
+  healthGoals                          Json?     @default("[]") @map("\"healthGoals\"")
   allergies                            Json?     @default("[]")
-  sustainabilityPreference             String?   @default("medium")
-  nutritionFocus                       Json?     @default("[]")
-  calorieTarget                        Int?
-  proteinTarget                        Int?
-  carbTarget                           Int?
-  fatTarget                            Int?
-  rawQuizAnswers                       Json?
-  createdAt                            DateTime? @default(now()) @db.Timestamptz(6)
-  updatedAt                            DateTime? @default(now()) @db.Timestamptz(6)
-  userId                               String?   @db.Uuid
+  sustainabilityPreference             String?   @default("medium") @map("\"sustainabilityPreference\"")
+  nutritionFocus                       Json?     @default("[]") @map("\"nutritionFocus\"")
+  calorieTarget                        Int?      @map("\"calorieTarget\"")
+  proteinTarget                        Int?      @map("\"proteinTarget\"")
+  carbTarget                           Int?      @map("\"carbTarget\"")
+  fatTarget                            Int?      @map("\"fatTarget\"")
+  rawQuizAnswers                       Json?     @map("\"rawQuizAnswers\"")
+  createdAt                            DateTime? @default(now()) @map("\"createdAt\"") @db.Timestamptz(6)
+  updatedAt                            DateTime? @default(now()) @map("\"updatedAt\"") @db.Timestamptz(6)
+  cuisine                              String?   @default("Any")
   users_user_preferences_userIdTousers users?    @relation("user_preferences_userIdTousers", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users_user_preferences_useridTousers users?    @relation("user_preferences_useridTousers", fields: [userid], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId                               String?   @db.Uuid
 
   @@schema("public")
 }
@@ -453,12 +460,12 @@ model user_preferences {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model weekly_plan_recipes {
   id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  weeklyPlanId String       @db.Uuid
-  recipeData   Json
-  plannedDate  DateTime?    @db.Date
-  mealType     String?
-  createdAt    DateTime?    @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime?    @default(now()) @db.Timestamptz(6)
+  weeklyPlanId String       @db.Uuid @map("\"weeklyPlanId\"")
+  recipeData   Json         @map("\"recipeData\"")
+  plannedDate  DateTime?    @db.Date @map("\"plannedDate\"")
+  mealType     String?      @map("\"mealType\"")
+  createdAt    DateTime?    @default(now()) @map("\"createdAt\"") @db.Timestamptz(6)
+  updatedAt    DateTime?    @default(now()) @map("\"updatedAt\"") @db.Timestamptz(6)
   weekly_plans weekly_plans @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_weekly_plan")
 
   @@index([weeklyPlanId], map: "idx_weekly_plan_recipes_plan_id")
@@ -468,14 +475,14 @@ model weekly_plan_recipes {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model weekly_plans {
   id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId              String                @db.Uuid
-  weekStartDate       DateTime              @db.Date
-  createdAt           DateTime?             @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime?             @default(now()) @db.Timestamptz(6)
+  userid              String                @db.Uuid
+  weekStartDate       DateTime              @db.Date @map("\"weekStartDate\"")
+  createdAt           DateTime?             @default(now()) @map("\"createdAt\"") @db.Timestamptz(6)
+  updatedAt           DateTime?             @default(now()) @map("\"updatedAt\"") @db.Timestamptz(6)
   weekly_plan_recipes weekly_plan_recipes[]
-  users               users                 @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_auth_user_weekly_plans")
+  users               users                 @relation(fields: [userid], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_auth_user_weekly_plans")
 
-  @@index([userId], map: "idx_weekly_plans_user_id")
+  @@index([userid], map: "idx_weekly_plans_user_id")
   @@schema("public")
 }
 
