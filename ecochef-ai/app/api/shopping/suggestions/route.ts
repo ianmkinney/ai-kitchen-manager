@@ -22,7 +22,7 @@ export async function GET() {
     const supabase = await createServerClient();
     
     // Get user preferences
-    const userPrefs = await prisma.userPreferences.findUnique({
+    const userPrefs = await prisma.user_preferences.findUnique({
       where: {
         userId: user.id
       }
