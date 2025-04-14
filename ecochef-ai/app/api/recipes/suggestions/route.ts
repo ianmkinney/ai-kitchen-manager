@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../lib/db';
 import { createServerClient, getCurrentUser } from '../../../lib/supabase-server';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../../lib/env';
@@ -31,12 +30,23 @@ export async function POST(request: Request) {
     // Create server client with our helper
     const supabase = await createServerClient();
     
-    // Get user preferences
-    const userPrefs = await prisma.user_preferences.findUnique({
-      where: {
-        userid: user.id
+    // Get user preferences using direct Supabase query to avoid Prisma issues
+    let userPrefs = null;
+    try {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('userid', user.id)
+        .single();
+        
+      if (!error && data) {
+        userPrefs = data;
+      } else {
+        console.log('No user preferences found, using defaults');
       }
-    });
+    } catch (prefError) {
+      console.error('Error fetching user preferences:', prefError);
+    }
     
     // Get current pantry items from Supabase
     const { data: pantryItems, error } = await supabase
