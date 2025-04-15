@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, getCurrentUser } from '../../../lib/supabase-server';
-import { prisma } from '../../../lib/db';
 
 // Helper function to categorize ingredients
 function categorizeIngredient(ingredient: string): string {
