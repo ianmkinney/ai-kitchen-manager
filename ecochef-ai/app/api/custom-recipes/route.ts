@@ -30,7 +30,7 @@ type RecipeCreateData = {
 }
 
 // GET handler for retrieving all custom recipes for the current user
-export async function GET(_: NextRequest) {
+export async function GET() {
   try {
     // Initialize Supabase server client
     const supabase = await createServerClient();
