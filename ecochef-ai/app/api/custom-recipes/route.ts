@@ -1,7 +1,6 @@
 // filepath: c:\Users\Katie\OneDrive\Desktop\Ian's Stuff\ai-kitchen-manager\ecochef-ai\app\api\custom-recipes\route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '../../lib/supabase-server';
-import { prisma } from '../../lib/db'; // Import the singleton Prisma instance
 
 // Define types for our recipe data
 interface RecipeData {
@@ -15,17 +14,52 @@ interface RecipeData {
   time?: string;
 }
 
-// Type for recipe creation data
-// Only allow string[] for ingredients and instructions
-type RecipeCreateData = {
-  userId: string;
-  name: string;
-  ingredients: string[];
-  instructions: string[];
-  cuisine?: string;
-  description?: string;
-  difficulty?: string;
-  time?: string;
+// Mock recipes to use when database is unavailable
+const mockCustomRecipes = [
+  {
+    id: "mock-recipe-1",
+    userId: "00000000-0000-0000-0000-000000000000",
+    name: "Pasta with Tomato Sauce",
+    ingredients: ["Pasta", "Tomatoes", "Garlic", "Olive oil", "Basil"],
+    instructions: ["Boil pasta", "Sauté garlic in oil", "Add tomatoes and simmer", "Mix with pasta", "Garnish with basil"],
+    cuisine: "Italian",
+    description: "A simple and delicious pasta dish",
+    difficulty: "Easy",
+    time: "20 minutes",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    id: "mock-recipe-2",
+    userId: "00000000-0000-0000-0000-000000000000",
+    name: "Avocado Toast",
+    ingredients: ["Bread", "Avocado", "Salt", "Pepper", "Lemon juice"],
+    instructions: ["Toast bread", "Mash avocado", "Season with salt, pepper, and lemon juice", "Spread on toast"],
+    cuisine: "American",
+    description: "Quick and nutritious breakfast",
+    difficulty: "Easy",
+    time: "5 minutes",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+];
+
+// Helper function to safely parse JSON from database
+function safeParseJson(value: any, defaultValue: any[] = []): any[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  }
+  
+  return defaultValue;
 }
 
 // GET handler for retrieving all custom recipes for the current user
@@ -40,43 +74,37 @@ export async function GET() {
       
       console.log('Fetching recipes for test user:', testUserId);
       
-      // Query the database for all custom recipes belonging to the test user
-      const customRecipes = await prisma.custom_recipes.findMany({
-        where: {
-          userId: testUserId
-        },
-        orderBy: {
-          createdAt: 'desc'
+      try {
+        // Query the database for all custom recipes belonging to the test user
+        const { data: customRecipes, error } = await supabase
+          .from('custom_recipes')
+          .select('*')
+          .eq('userId', testUserId)
+          .order('createdAt', { ascending: false });
+        
+        if (error) {
+          throw error;
         }
-      });
-      
-      console.log(`Found ${customRecipes.length} test user recipes`);
-      
-      // Parse the JSON fields from the database
-      const formattedRecipes = customRecipes.map(recipe => {
-        try {
-          return {
-            ...recipe,
-            ingredients: Array.isArray(recipe.ingredients) 
-              ? recipe.ingredients 
-              : JSON.parse(typeof recipe.ingredients === 'string' ? recipe.ingredients : '[]'),
-            instructions: Array.isArray(recipe.instructions) 
-              ? recipe.instructions 
-              : JSON.parse(typeof recipe.instructions === 'string' ? recipe.instructions : '[]')
-          };
-        } catch (parseError) {
-          console.error('Error parsing recipe data:', parseError, recipe);
-          // Return with empty arrays as fallback
-          return {
-            ...recipe,
-            ingredients: [],
-            instructions: []
-          };
-        }
-      });
-      
-      // Return the recipes as JSON
-      return NextResponse.json({ customRecipes: formattedRecipes });
+        
+        console.log(`Found ${customRecipes?.length || 0} test user recipes`);
+        
+        // Process recipes to ensure proper JSON parsing
+        const formattedRecipes = customRecipes?.map(recipe => ({
+          ...recipe,
+          ingredients: safeParseJson(recipe.ingredients),
+          instructions: safeParseJson(recipe.instructions)
+        })) || [];
+        
+        // Return the recipes as JSON
+        return NextResponse.json({ customRecipes: formattedRecipes });
+      } catch (error) {
+        // If we hit an error, use mock recipes for test user
+        console.warn('Error fetching test user recipes, returning mock data:', error);
+        return NextResponse.json({ 
+          customRecipes: mockCustomRecipes,
+          isMockData: true 
+        });
+      }
     }
     
     // For normal users, get the user from Supabase auth
@@ -93,43 +121,32 @@ export async function GET() {
     
     console.log('Fetching recipes for authenticated user:', user.id);
     
-    // Query the database for all custom recipes belonging to the current user
-    const customRecipes = await prisma.custom_recipes.findMany({
-      where: {
-        userId: user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
+    try {
+      // Query the database for all custom recipes belonging to the current user
+      const { data: customRecipes, error } = await supabase
+        .from('custom_recipes')
+        .select('*')
+        .eq('userId', user.id)
+        .order('createdAt', { ascending: false });
+      
+      if (error) {
+        throw error;
       }
-    });
-    
-    console.log(`Found ${customRecipes.length} recipes for user ${user.id}`);
-    
-    // Parse the JSON fields from the database with improved error handling
-    const formattedRecipes = customRecipes.map(recipe => {
-      try {
-        return {
-          ...recipe,
-          ingredients: Array.isArray(recipe.ingredients) 
-            ? recipe.ingredients 
-            : JSON.parse(typeof recipe.ingredients === 'string' ? recipe.ingredients : '[]'),
-          instructions: Array.isArray(recipe.instructions) 
-            ? recipe.instructions 
-            : JSON.parse(typeof recipe.instructions === 'string' ? recipe.instructions : '[]')
-        };
-      } catch (parseError) {
-        console.error('Error parsing recipe data:', parseError, recipe);
-        // Return with empty arrays as fallback
-        return {
-          ...recipe,
-          ingredients: [],
-          instructions: []
-        };
-      }
-    });
-    
-    // Return the recipes as JSON
-    return NextResponse.json({ customRecipes: formattedRecipes });
+      
+      console.log(`Found ${customRecipes?.length || 0} recipes for user ${user.id}`);
+      
+      // Process recipes to ensure proper JSON parsing
+      const formattedRecipes = customRecipes?.map(recipe => ({
+        ...recipe,
+        ingredients: safeParseJson(recipe.ingredients),
+        instructions: safeParseJson(recipe.instructions)
+      })) || [];
+      
+      // Return the recipes as JSON
+      return NextResponse.json({ customRecipes: formattedRecipes });
+    } catch (error) {
+      throw error;
+    }
   } catch (error) {
     console.error('Error fetching custom recipes:', error);
     
@@ -173,91 +190,44 @@ export async function POST(req: NextRequest) {
       }
       
       // Ensure ingredients and instructions are arrays of strings
-      let ingredients: string[] = [];
-      let instructions: string[] = [];
+      let ingredients = safeParseJson(recipeData.ingredients);
+      let instructions = safeParseJson(recipeData.instructions);
       
-      // Handle various formats the ingredients might be in
-      if (Array.isArray(recipeData.ingredients)) {
-        ingredients = recipeData.ingredients as string[];
-      } else if (typeof recipeData.ingredients === 'string') {
-        try {
-          // Try to parse if it's a JSON string
-          ingredients = JSON.parse(recipeData.ingredients);
-          if (!Array.isArray(ingredients)) {
-            ingredients = [recipeData.ingredients];
-          }
-        } catch {
-          // If parsing fails, treat as a single string
-          ingredients = [recipeData.ingredients];
-        }
-      }
-      
-      // Handle various formats the instructions might be in
-      if (Array.isArray(recipeData.instructions)) {
-        instructions = recipeData.instructions as string[];
-      } else if (typeof recipeData.instructions === 'string') {
-        try {
-          // Try to parse if it's a JSON string
-          instructions = JSON.parse(recipeData.instructions);
-          if (!Array.isArray(instructions)) {
-            instructions = [recipeData.instructions];
-          }
-        } catch {
-          // If parsing fails, treat as a single string
-          instructions = [recipeData.instructions];
-        }
-      }
-        
-      // Construct the data object, omitting optional fields if they are falsy (null, undefined, empty string)
-      const dataToCreate: RecipeCreateData = {
+      // Prepare data to insert
+      const newRecipeData = {
         userId: testUserId,
         name: recipeData.name,
         ingredients,
         instructions,
+        cuisine: recipeData.cuisine || undefined,
+        description: recipeData.description || undefined,
+        difficulty: recipeData.difficulty || undefined,
+        time: recipeData.time || undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
+
+      console.log('Data being sent to Supabase (test user):', JSON.stringify(newRecipeData, null, 2));
+
+      // Create the new recipe in the database
+      const { data: newRecipe, error } = await supabase
+        .from('custom_recipes')
+        .insert(newRecipeData)
+        .select()
+        .single();
       
-      if (recipeData.cuisine) dataToCreate.cuisine = recipeData.cuisine;
-      if (recipeData.description) dataToCreate.description = recipeData.description;
-      if (recipeData.difficulty) dataToCreate.difficulty = recipeData.difficulty;
-      if (recipeData.time) dataToCreate.time = recipeData.time;
-
-      console.log('Data being sent to Prisma (test user):', JSON.stringify(dataToCreate, null, 2));
-
-      // Create the new recipe in the database for the test user
-      const newRecipe = await prisma.custom_recipes.create({
-        data: dataToCreate
-      });
+      if (error) {
+        throw error;
+      }
       
       console.log('New recipe created:', newRecipe.id);
       
-      // Process the recipe's ingredients and instructions for the response
-      let responseIngredients: string[];
-      let responseInstructions: string[];
-      
-      try {
-        responseIngredients = Array.isArray(newRecipe.ingredients) 
-          ? newRecipe.ingredients 
-          : JSON.parse(typeof newRecipe.ingredients === 'string' ? newRecipe.ingredients : '[]');
-      } catch {
-        console.error('Error parsing ingredients for response');
-        responseIngredients = [];
-      }
-      
-      try {
-        responseInstructions = Array.isArray(newRecipe.instructions) 
-          ? newRecipe.instructions 
-          : JSON.parse(typeof newRecipe.instructions === 'string' ? newRecipe.instructions : '[]');
-      } catch {
-        console.error('Error parsing instructions for response');
-        responseInstructions = [];
-      }
-      
-      // Return the newly created recipe with safely processed fields
+      // Return the newly created recipe
       return NextResponse.json({ 
         recipe: {
           ...newRecipe,
-          ingredients: responseIngredients,
-          instructions: responseInstructions,
+          ingredients: safeParseJson(newRecipe.ingredients),
+          instructions: safeParseJson(newRecipe.instructions),
         },
         message: 'Recipe created successfully' 
       }, { status: 201 });
@@ -288,92 +258,45 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Ensure ingredients and instructions are arrays of strings with robust handling
-    let ingredients: string[] = [];
-    let instructions: string[] = [];
+    // Ensure ingredients and instructions are arrays of strings
+    let ingredients = safeParseJson(recipeData.ingredients);
+    let instructions = safeParseJson(recipeData.instructions);
     
-    // Handle various formats the ingredients might be in
-    if (Array.isArray(recipeData.ingredients)) {
-      ingredients = recipeData.ingredients as string[];
-    } else if (typeof recipeData.ingredients === 'string') {
-      try {
-        // Try to parse if it's a JSON string
-        ingredients = JSON.parse(recipeData.ingredients);
-        if (!Array.isArray(ingredients)) {
-          ingredients = [recipeData.ingredients];
-        }
-      } catch {
-        // If parsing fails, treat as a single string
-        ingredients = [recipeData.ingredients];
-      }
-    }
-    
-    // Handle various formats the instructions might be in
-    if (Array.isArray(recipeData.instructions)) {
-      instructions = recipeData.instructions as string[];
-    } else if (typeof recipeData.instructions === 'string') {
-      try {
-        // Try to parse if it's a JSON string
-        instructions = JSON.parse(recipeData.instructions);
-        if (!Array.isArray(instructions)) {
-          instructions = [recipeData.instructions];
-        }
-      } catch {
-        // If parsing fails, treat as a single string
-        instructions = [recipeData.instructions];
-      }
-    }
-      
-    // Construct the data object, omitting optional fields if they are falsy
-    const dataToCreate: RecipeCreateData = {
+    // Prepare data to insert
+    const newRecipeData = {
       userId: user.id,
       name: recipeData.name,
       ingredients,
       instructions,
+      cuisine: recipeData.cuisine || undefined,
+      description: recipeData.description || undefined,
+      difficulty: recipeData.difficulty || undefined,
+      time: recipeData.time || undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
-    
-    if (recipeData.cuisine) dataToCreate.cuisine = recipeData.cuisine;
-    if (recipeData.description) dataToCreate.description = recipeData.description;
-    if (recipeData.difficulty) dataToCreate.difficulty = recipeData.difficulty;
-    if (recipeData.time) dataToCreate.time = recipeData.time;
 
-    console.log('Data being sent to Prisma (normal user):', JSON.stringify(dataToCreate, null, 2));
+    console.log('Data being sent to Supabase (normal user):', JSON.stringify(newRecipeData, null, 2));
 
     // Create the new recipe in the database
-    const newRecipe = await prisma.custom_recipes.create({
-      data: dataToCreate
-    });
+    const { data: newRecipe, error } = await supabase
+      .from('custom_recipes')
+      .insert(newRecipeData)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
     
     console.log('New recipe created:', newRecipe.id);
     
-    // Process the recipe's ingredients and instructions for the response
-    let responseIngredients: string[];
-    let responseInstructions: string[];
-    
-    try {
-      responseIngredients = Array.isArray(newRecipe.ingredients) 
-        ? newRecipe.ingredients 
-        : JSON.parse(typeof newRecipe.ingredients === 'string' ? newRecipe.ingredients : '[]');
-    } catch {
-      console.error('Error parsing ingredients for response');
-      responseIngredients = [];
-    }
-    
-    try {
-      responseInstructions = Array.isArray(newRecipe.instructions) 
-        ? newRecipe.instructions 
-        : JSON.parse(typeof newRecipe.instructions === 'string' ? newRecipe.instructions : '[]');
-    } catch {
-      console.error('Error parsing instructions for response');
-      responseInstructions = [];
-    }
-    
-    // Return the newly created recipe with safely processed fields
+    // Return the newly created recipe
     return NextResponse.json({ 
       recipe: {
         ...newRecipe,
-        ingredients: responseIngredients,
-        instructions: responseInstructions,
+        ingredients: safeParseJson(newRecipe.ingredients),
+        instructions: safeParseJson(newRecipe.instructions),
       },
       message: 'Recipe created successfully' 
     }, { status: 201 });
@@ -420,14 +343,14 @@ export async function PUT(req: NextRequest) {
       }
       
       // Check if the recipe exists and belongs to the test user
-      const existingRecipe = await prisma.custom_recipes.findFirst({
-        where: {
-          id: recipeData.id,
-          userId: testUserId
-        }
-      });
+      const { data: existingRecipe, error: findError } = await supabase
+        .from('custom_recipes')
+        .select('*')
+        .eq('id', recipeData.id)
+        .eq('userId', testUserId)
+        .single();
       
-      if (!existingRecipe) {
+      if (findError || !existingRecipe) {
         console.warn(`Recipe ${recipeData.id} not found for test user or permission denied`);
         return NextResponse.json(
           { error: 'Recipe not found or you do not have permission to update it' },
@@ -437,41 +360,9 @@ export async function PUT(req: NextRequest) {
       
       console.log(`Found existing recipe: ${existingRecipe.id} - ${existingRecipe.name}`);
       
-      // Ensure ingredients and instructions are arrays with robust handling
-      let ingredients: string[] = [];
-      let instructions: string[] = [];
-      
-      // Handle various formats the ingredients might be in
-      if (Array.isArray(recipeData.ingredients)) {
-        ingredients = recipeData.ingredients as string[];
-      } else if (typeof recipeData.ingredients === 'string') {
-        try {
-          // Try to parse if it's a JSON string
-          ingredients = JSON.parse(recipeData.ingredients);
-          if (!Array.isArray(ingredients)) {
-            ingredients = [recipeData.ingredients];
-          }
-        } catch {
-          // If parsing fails, treat as a single string
-          ingredients = [recipeData.ingredients];
-        }
-      }
-      
-      // Handle various formats the instructions might be in
-      if (Array.isArray(recipeData.instructions)) {
-        instructions = recipeData.instructions as string[];
-      } else if (typeof recipeData.instructions === 'string') {
-        try {
-          // Try to parse if it's a JSON string
-          instructions = JSON.parse(recipeData.instructions);
-          if (!Array.isArray(instructions)) {
-            instructions = [recipeData.instructions];
-          }
-        } catch {
-          // If parsing fails, treat as a single string
-          instructions = [recipeData.instructions];
-        }
-      }
+      // Ensure ingredients and instructions are arrays
+      let ingredients = safeParseJson(recipeData.ingredients);
+      let instructions = safeParseJson(recipeData.instructions);
       
       console.log('Data being sent to update recipe:', {
         id: recipeData.id,
@@ -481,53 +372,34 @@ export async function PUT(req: NextRequest) {
       });
       
       // Update the recipe in the database
-      const updatedRecipe = await prisma.custom_recipes.update({
-        where: {
-          id: recipeData.id
-        },
-        data: {
+      const { data: updatedRecipe, error: updateError } = await supabase
+        .from('custom_recipes')
+        .update({
           name: recipeData.name,
-          ingredients: ingredients,
-          instructions: instructions,
-          // Use undefined instead of null or empty string for optional fields
+          ingredients,
+          instructions,
           cuisine: recipeData.cuisine || undefined,
           description: recipeData.description || undefined,
           difficulty: recipeData.difficulty || undefined,
           time: recipeData.time || undefined,
-          updatedAt: new Date()
-        }
-      });
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', recipeData.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        throw updateError;
+      }
       
       console.log(`Recipe updated successfully: ${updatedRecipe.id}`);
       
-      // Process the recipe's ingredients and instructions for the response
-      let responseIngredients: string[];
-      let responseInstructions: string[];
-      
-      try {
-        responseIngredients = Array.isArray(updatedRecipe.ingredients) 
-          ? updatedRecipe.ingredients 
-          : JSON.parse(typeof updatedRecipe.ingredients === 'string' ? updatedRecipe.ingredients : '[]');
-      } catch {
-        console.error('Error parsing ingredients for response');
-        responseIngredients = [];
-      }
-      
-      try {
-        responseInstructions = Array.isArray(updatedRecipe.instructions) 
-          ? updatedRecipe.instructions 
-          : JSON.parse(typeof updatedRecipe.instructions === 'string' ? updatedRecipe.instructions : '[]');
-      } catch {
-        console.error('Error parsing instructions for response');
-        responseInstructions = [];
-      }
-      
-      // Return the updated recipe with safely processed fields
+      // Return the updated recipe
       return NextResponse.json({ 
         recipe: {
           ...updatedRecipe,
-          ingredients: responseIngredients,
-          instructions: responseInstructions
+          ingredients: safeParseJson(updatedRecipe.ingredients),
+          instructions: safeParseJson(updatedRecipe.instructions)
         },
         message: 'Recipe updated successfully' 
       });
@@ -559,14 +431,14 @@ export async function PUT(req: NextRequest) {
     }
     
     // Check if the recipe exists and belongs to the current user
-    const existingRecipe = await prisma.custom_recipes.findFirst({
-      where: {
-        id: recipeData.id,
-        userId: user.id
-      }
-    });
+    const { data: existingRecipe, error: findError } = await supabase
+      .from('custom_recipes')
+      .select('*')
+      .eq('id', recipeData.id)
+      .eq('userId', user.id)
+      .single();
     
-    if (!existingRecipe) {
+    if (findError || !existingRecipe) {
       console.warn(`Recipe ${recipeData.id} not found for user ${user.id} or permission denied`);
       return NextResponse.json(
         { error: 'Recipe not found or you do not have permission to update it' },
@@ -576,37 +448,9 @@ export async function PUT(req: NextRequest) {
     
     console.log(`Found existing recipe: ${existingRecipe.id} - ${existingRecipe.name}`);
     
-    // Ensure ingredients and instructions are arrays with robust handling
-    let ingredients: string[] = [];
-    let instructions: string[] = [];
-    
-    // Handle various formats the ingredients might be in
-    if (Array.isArray(recipeData.ingredients)) {
-      ingredients = recipeData.ingredients as string[];
-    } else if (typeof recipeData.ingredients === 'string') {
-      try {
-        ingredients = JSON.parse(recipeData.ingredients);
-        if (!Array.isArray(ingredients)) {
-          ingredients = [recipeData.ingredients];
-        }
-      } catch {
-        ingredients = [recipeData.ingredients];
-      }
-    }
-    
-    // Handle various formats the instructions might be in
-    if (Array.isArray(recipeData.instructions)) {
-      instructions = recipeData.instructions as string[];
-    } else if (typeof recipeData.instructions === 'string') {
-      try {
-        instructions = JSON.parse(recipeData.instructions);
-        if (!Array.isArray(instructions)) {
-          instructions = [recipeData.instructions];
-        }
-      } catch {
-        instructions = [recipeData.instructions];
-      }
-    }
+    // Ensure ingredients and instructions are arrays
+    let ingredients = safeParseJson(recipeData.ingredients);
+    let instructions = safeParseJson(recipeData.instructions);
     
     console.log('Data being sent to update recipe:', {
       id: recipeData.id,
@@ -616,53 +460,34 @@ export async function PUT(req: NextRequest) {
     });
     
     // Update the recipe in the database
-    const updatedRecipe = await prisma.custom_recipes.update({
-      where: {
-        id: recipeData.id
-      },
-      data: {
+    const { data: updatedRecipe, error: updateError } = await supabase
+      .from('custom_recipes')
+      .update({
         name: recipeData.name,
-        ingredients: ingredients,
-        instructions: instructions,
-        // Use undefined instead of null or empty string for optional fields
+        ingredients,
+        instructions,
         cuisine: recipeData.cuisine || undefined,
         description: recipeData.description || undefined,
         difficulty: recipeData.difficulty || undefined,
         time: recipeData.time || undefined,
-        updatedAt: new Date()
-      }
-    });
+        updatedAt: new Date().toISOString()
+      })
+      .eq('id', recipeData.id)
+      .select()
+      .single();
+    
+    if (updateError) {
+      throw updateError;
+    }
     
     console.log(`Recipe updated successfully: ${updatedRecipe.id}`);
     
-    // Process the recipe's ingredients and instructions for the response
-    let responseIngredients: string[];
-    let responseInstructions: string[];
-    
-    try {
-      responseIngredients = Array.isArray(updatedRecipe.ingredients) 
-        ? updatedRecipe.ingredients 
-        : JSON.parse(typeof updatedRecipe.ingredients === 'string' ? updatedRecipe.ingredients : '[]');
-    } catch {
-      console.error('Error parsing ingredients for response');
-      responseIngredients = [];
-    }
-    
-    try {
-      responseInstructions = Array.isArray(updatedRecipe.instructions) 
-        ? updatedRecipe.instructions 
-        : JSON.parse(typeof updatedRecipe.instructions === 'string' ? updatedRecipe.instructions : '[]');
-    } catch {
-      console.error('Error parsing instructions for response');
-      responseInstructions = [];
-    }
-    
-    // Return the updated recipe with safely processed fields
+    // Return the updated recipe
     return NextResponse.json({ 
       recipe: {
         ...updatedRecipe,
-        ingredients: responseIngredients,
-        instructions: responseInstructions
+        ingredients: safeParseJson(updatedRecipe.ingredients),
+        instructions: safeParseJson(updatedRecipe.instructions)
       },
       message: 'Recipe updated successfully' 
     });
@@ -712,14 +537,14 @@ export async function DELETE(req: NextRequest) {
       console.log(`Attempting to delete recipe: ${recipeId}`);
       
       // Check if the recipe exists and belongs to the test user
-      const existingRecipe = await prisma.custom_recipes.findFirst({
-        where: {
-          id: recipeId,
-          userId: testUserId
-        }
-      });
+      const { data: existingRecipe, error: findError } = await supabase
+        .from('custom_recipes')
+        .select('*')
+        .eq('id', recipeId)
+        .eq('userId', testUserId)
+        .single();
       
-      if (!existingRecipe) {
+      if (findError || !existingRecipe) {
         console.warn(`Recipe ${recipeId} not found for test user or permission denied`);
         return NextResponse.json(
           { error: 'Recipe not found or you do not have permission to delete it' },
@@ -730,11 +555,14 @@ export async function DELETE(req: NextRequest) {
       console.log(`Found recipe to delete: ${existingRecipe.id} - ${existingRecipe.name}`);
       
       // Delete the recipe from the database
-      await prisma.custom_recipes.delete({
-        where: {
-          id: recipeId
-        }
-      });
+      const { error: deleteError } = await supabase
+        .from('custom_recipes')
+        .delete()
+        .eq('id', recipeId);
+      
+      if (deleteError) {
+        throw deleteError;
+      }
       
       console.log(`Recipe deleted successfully: ${recipeId}`);
       
@@ -773,14 +601,14 @@ export async function DELETE(req: NextRequest) {
     console.log(`Attempting to delete recipe: ${recipeId}`);
     
     // Check if the recipe exists and belongs to the current user
-    const existingRecipe = await prisma.custom_recipes.findFirst({
-      where: {
-        id: recipeId,
-        userId: user.id
-      }
-    });
+    const { data: existingRecipe, error: findError } = await supabase
+      .from('custom_recipes')
+      .select('*')
+      .eq('id', recipeId)
+      .eq('userId', user.id)
+      .single();
     
-    if (!existingRecipe) {
+    if (findError || !existingRecipe) {
       console.warn(`Recipe ${recipeId} not found for user ${user.id} or permission denied`);
       return NextResponse.json(
         { error: 'Recipe not found or you do not have permission to delete it' },
@@ -791,11 +619,14 @@ export async function DELETE(req: NextRequest) {
     console.log(`Found recipe to delete: ${existingRecipe.id} - ${existingRecipe.name}`);
     
     // Delete the recipe from the database
-    await prisma.custom_recipes.delete({
-      where: {
-        id: recipeId
-      }
-    });
+    const { error: deleteError } = await supabase
+      .from('custom_recipes')
+      .delete()
+      .eq('id', recipeId);
+    
+    if (deleteError) {
+      throw deleteError;
+    }
     
     console.log(`Recipe deleted successfully: ${recipeId}`);
     
