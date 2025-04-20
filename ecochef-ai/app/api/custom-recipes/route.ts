@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
           if (!Array.isArray(ingredients)) {
             ingredients = [recipeData.ingredients];
           }
-        } catch (_e) {
+        } catch (_) {
           // If parsing fails, treat as a single string
           ingredients = [recipeData.ingredients];
         }
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
           if (!Array.isArray(instructions)) {
             instructions = [recipeData.instructions];
           }
-        } catch (_e) {
+        } catch (_) {
           // If parsing fails, treat as a single string
           instructions = [recipeData.instructions];
         }
@@ -252,8 +252,8 @@ export async function POST(req: NextRequest) {
         responseIngredients = Array.isArray(newRecipe.ingredients) 
           ? newRecipe.ingredients 
           : JSON.parse(typeof newRecipe.ingredients === 'string' ? newRecipe.ingredients : '[]');
-      } catch (_e) {
-        console.error('Error parsing ingredients for response:', _e);
+      } catch (_) {
+        console.error('Error parsing ingredients for response:', _);
         responseIngredients = [];
       }
       
@@ -261,8 +261,8 @@ export async function POST(req: NextRequest) {
         responseInstructions = Array.isArray(newRecipe.instructions) 
           ? newRecipe.instructions 
           : JSON.parse(typeof newRecipe.instructions === 'string' ? newRecipe.instructions : '[]');
-      } catch (_e) {
-        console.error('Error parsing instructions for response:', _e);
+      } catch (_) {
+        console.error('Error parsing instructions for response:', _);
         responseInstructions = [];
       }
       
@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
         if (!Array.isArray(ingredients)) {
           ingredients = [recipeData.ingredients];
         }
-      } catch (_e) {
+      } catch (_) {
         // If parsing fails, treat as a single string
         ingredients = [recipeData.ingredients];
       }
@@ -332,7 +332,7 @@ export async function POST(req: NextRequest) {
         if (!Array.isArray(instructions)) {
           instructions = [recipeData.instructions];
         }
-      } catch (_e) {
+      } catch (_) {
         // If parsing fails, treat as a single string
         instructions = [recipeData.instructions];
       }
@@ -368,8 +368,8 @@ export async function POST(req: NextRequest) {
       responseIngredients = Array.isArray(newRecipe.ingredients) 
         ? newRecipe.ingredients 
         : JSON.parse(typeof newRecipe.ingredients === 'string' ? newRecipe.ingredients : '[]');
-    } catch (_e) {
-      console.error('Error parsing ingredients for response:', _e);
+    } catch (_) {
+      console.error('Error parsing ingredients for response:', _);
       responseIngredients = [];
     }
     
@@ -377,8 +377,8 @@ export async function POST(req: NextRequest) {
       responseInstructions = Array.isArray(newRecipe.instructions) 
         ? newRecipe.instructions 
         : JSON.parse(typeof newRecipe.instructions === 'string' ? newRecipe.instructions : '[]');
-    } catch (_e) {
-      console.error('Error parsing instructions for response:', _e);
+    } catch (_) {
+      console.error('Error parsing instructions for response:', _);
       responseInstructions = [];
     }
     
@@ -465,7 +465,7 @@ export async function PUT(req: NextRequest) {
           if (!Array.isArray(ingredients)) {
             ingredients = [recipeData.ingredients];
           }
-        } catch (_e) {
+        } catch (_) {
           // If parsing fails, treat as a single string
           ingredients = [recipeData.ingredients];
         }
@@ -481,7 +481,7 @@ export async function PUT(req: NextRequest) {
           if (!Array.isArray(instructions)) {
             instructions = [recipeData.instructions];
           }
-        } catch (_e) {
+        } catch (_) {
           // If parsing fails, treat as a single string
           instructions = [recipeData.instructions];
         }
@@ -522,8 +522,8 @@ export async function PUT(req: NextRequest) {
         responseIngredients = Array.isArray(updatedRecipe.ingredients) 
           ? updatedRecipe.ingredients 
           : JSON.parse(typeof updatedRecipe.ingredients === 'string' ? updatedRecipe.ingredients : '[]');
-      } catch (_e) {
-        console.error('Error parsing ingredients for response:', _e);
+      } catch (_) {
+        console.error('Error parsing ingredients for response:', _);
         responseIngredients = [];
       }
       
@@ -531,8 +531,8 @@ export async function PUT(req: NextRequest) {
         responseInstructions = Array.isArray(updatedRecipe.instructions) 
           ? updatedRecipe.instructions 
           : JSON.parse(typeof updatedRecipe.instructions === 'string' ? updatedRecipe.instructions : '[]');
-      } catch (_e) {
-        console.error('Error parsing instructions for response:', _e);
+      } catch (_) {
+        console.error('Error parsing instructions for response:', _);
         responseInstructions = [];
       }
       
@@ -603,7 +603,7 @@ export async function PUT(req: NextRequest) {
         if (!Array.isArray(ingredients)) {
           ingredients = [recipeData.ingredients];
         }
-      } catch (_e) {
+      } catch (_) {
         ingredients = [recipeData.ingredients];
       }
     }
@@ -617,7 +617,7 @@ export async function PUT(req: NextRequest) {
         if (!Array.isArray(instructions)) {
           instructions = [recipeData.instructions];
         }
-      } catch (_e) {
+      } catch (_) {
         instructions = [recipeData.instructions];
       }
     }
@@ -657,8 +657,8 @@ export async function PUT(req: NextRequest) {
       responseIngredients = Array.isArray(updatedRecipe.ingredients) 
         ? updatedRecipe.ingredients 
         : JSON.parse(typeof updatedRecipe.ingredients === 'string' ? updatedRecipe.ingredients : '[]');
-    } catch (_e) {
-      console.error('Error parsing ingredients for response:', _e);
+    } catch (_) {
+      console.error('Error parsing ingredients for response:', _);
       responseIngredients = [];
     }
     
@@ -666,8 +666,8 @@ export async function PUT(req: NextRequest) {
       responseInstructions = Array.isArray(updatedRecipe.instructions) 
         ? updatedRecipe.instructions 
         : JSON.parse(typeof updatedRecipe.instructions === 'string' ? updatedRecipe.instructions : '[]');
-    } catch (_e) {
-      console.error('Error parsing instructions for response:', _e);
+    } catch (_) {
+      console.error('Error parsing instructions for response:', _);
       responseInstructions = [];
     }
     
