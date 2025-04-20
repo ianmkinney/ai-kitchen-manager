@@ -17,20 +17,25 @@ function createPrismaClient() {
     errorFormat: 'pretty',
   }).$extends({
     query: {
-      async $allOperations({ args, query, operation, model, runInTransaction }) {
+      async $allOperations({ args, query }) {
         const MAX_RETRIES = 3;
         let retries = 0;
         
         while (true) {
           try {
             return await query(args);
-          } catch (error: any) {
+          } catch (error: Error | unknown) {
+            // Type guard to check if error is an object with a message property
+            const errorMessage = error instanceof Error ? error.message : 
+              (typeof error === 'object' && error !== null && 'message' in error) ? 
+              String(error.message) : 'Unknown error';
+            
             // Check if this is a connection error that we should retry
             const isConnectionError = 
-              error?.message?.includes("Can't reach database server") ||
-              error?.message?.includes("Connection timed out") ||
-              error?.message?.includes("Connection refused") ||
-              error?.message?.includes("Connection terminated unexpectedly");
+              errorMessage.includes("Can't reach database server") ||
+              errorMessage.includes("Connection timed out") ||
+              errorMessage.includes("Connection refused") ||
+              errorMessage.includes("Connection terminated unexpectedly");
               
             // If we've hit max retries or it's not a connection error, throw
             if (retries >= MAX_RETRIES || !isConnectionError) {
