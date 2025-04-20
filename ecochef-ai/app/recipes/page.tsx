@@ -55,7 +55,7 @@ function RecipeCard({ recipe, onEdit, onDelete }: {
 
   return (
     <div 
-      ref={drag as any}
+      ref={drag as unknown as React.RefObject<HTMLDivElement>}
       className={`p-4 bg-gray-50 rounded-lg shadow hover:shadow-md transition-shadow ${isDragging ? 'opacity-50' : ''}`}
       style={{ cursor: 'move' }}
     >
@@ -167,7 +167,6 @@ export default function CookingAssistant() {
     instructions: [''],
     isCustom: true
   });
-  const [isSubmitting, setIsSubmitting] = useState(false); // New state for submission status
   
   // Weekly plan recipes state
   const [weeklyPlanRecipes, setWeeklyPlanRecipes] = useState<Recipe[]>([]);
@@ -293,7 +292,6 @@ export default function CookingAssistant() {
     }
 
     try {
-      setIsSubmitting(true);
 
       if (editingRecipe && editingRecipe.id) {
         // Update existing recipe
@@ -368,8 +366,6 @@ export default function CookingAssistant() {
     } catch (error) {
       console.error('Error saving custom recipe:', error);
       alert('An error occurred while saving the recipe. Please try again.');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

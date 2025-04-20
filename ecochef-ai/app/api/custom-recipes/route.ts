@@ -30,7 +30,7 @@ type RecipeCreateData = {
 }
 
 // GET handler for retrieving all custom recipes for the current user
-export async function GET(request: NextRequest) {
+export async function GET(_: NextRequest) {
   try {
     // Initialize Supabase server client
     const supabase = await createServerClient();
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
 
       // Create the new recipe in the database for the test user
       const newRecipe = await prisma.custom_recipes.create({
-        data: dataToCreate as unknown as any
+        data: dataToCreate as RecipeCreateData
       });
       
       // Return the newly created recipe
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
 
     // Create the new recipe in the database
     const newRecipe = await prisma.custom_recipes.create({
-      data: dataToCreate as unknown as any
+      data: dataToCreate as RecipeCreateData
     });
     
     // Return the newly created recipe

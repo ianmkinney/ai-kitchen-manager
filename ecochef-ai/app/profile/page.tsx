@@ -127,9 +127,8 @@ export default function ProfilePage() {
     return value ? 'Yes' : 'No';
   };
 
-  const startEditing = (field: string, value: any) => {
+  const startEditing = (field: string, value: unknown) => {
     setEditingField(field);
-    
     // Handle different types of values appropriately for the form
     if (typeof value === 'boolean') {
       setTempEditValue(value ? 'true' : 'false');
@@ -146,32 +145,31 @@ export default function ProfilePage() {
   // Function to handle saving edited field
   const handleSaveField = async (fieldName: string) => {
     if (!preferences) return;
-    
     setIsSaving(true);
     try {
       const updatedPreferences = { ...preferences };
-      
       // Process the tempEditValue based on the field type
-      let valueToSave: any;
-      
+      let valueToSave: string | number | boolean | string[];
       // Handle different data types appropriately
-      if (['isVegetarian', 'isVegan', 'isGlutenFree', 'isDairyFree', 'isNutFree'].includes(fieldName)) {
+      if ([
+        'isVegetarian', 'isVegan', 'isGlutenFree', 'isDairyFree', 'isNutFree'
+      ].includes(fieldName)) {
         // Convert string 'true'/'false' back to boolean for boolean fields
         valueToSave = tempEditValue === 'true';
-      } else if (['maxCookingTime', 'peopleCount', 'spicyPreference', 'sweetPreference', 'savoryPreference'].includes(fieldName)) {
+      } else if ([
+        'maxCookingTime', 'peopleCount', 'spicyPreference', 'sweetPreference', 'savoryPreference'
+      ].includes(fieldName)) {
         // Ensure numbers are stored as numbers, not strings
         valueToSave = typeof tempEditValue === 'string' ? parseInt(tempEditValue, 10) : tempEditValue;
-      } else {
-        // For other fields (strings, arrays) use the value as is
+      } else if (Array.isArray(tempEditValue)) {
         valueToSave = tempEditValue;
+      } else {
+        valueToSave = tempEditValue as string;
       }
-      
       // Update the preference object with the proper type
-      (updatedPreferences as any)[fieldName] = valueToSave;
-      
+      (updatedPreferences as Record<string, unknown>)[fieldName] = valueToSave;
       // Prepare payload for API
-      const payload: any = {};
-      
+      const payload: Record<string, unknown> = {};
       // Map the field names back to the database names
       switch (fieldName) {
         case 'preferredCuisines':
@@ -183,7 +181,6 @@ export default function ProfilePage() {
         default:
           payload[fieldName] = valueToSave;
       }
-      
       // Call API to update preferences
       const response = await fetch('/api/preferences', {
         method: 'POST',
@@ -192,11 +189,9 @@ export default function ProfilePage() {
         },
         body: JSON.stringify(payload),
       });
-      
       if (!response.ok) {
         throw new Error('Failed to update preferences');
       }
-      
       // Update local state
       setPreferences(updatedPreferences);
     } catch (error) {

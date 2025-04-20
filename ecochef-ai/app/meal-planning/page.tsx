@@ -458,7 +458,7 @@ export default function MealPlanning() {
         const data = await response.json();
         
         // Format custom recipes to match the Recipe interface expected by the meal planning page
-        const formattedRecipes = data.customRecipes.map((recipe: any) => ({
+        const formattedRecipes = data.customRecipes.map((recipe: Recipe) => ({
           name: recipe.name,
           ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
           instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
