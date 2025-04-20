@@ -18,11 +18,12 @@ interface RecipeData {
 }
 
 // Type for recipe creation data
+// Only allow string[] for ingredients and instructions
 type RecipeCreateData = {
   userId: string;
   name: string;
-  ingredients: string[] | Record<string, unknown>;
-  instructions: string[] | Record<string, unknown>;
+  ingredients: string[];
+  instructions: string[];
   cuisine?: string;
   description?: string;
   difficulty?: string;
@@ -130,16 +131,16 @@ export async function POST(req: NextRequest) {
         );
       }
       
-      // Ensure ingredients and instructions are arrays, default to empty array if not.
-      const ingredients = Array.isArray(recipeData.ingredients) ? recipeData.ingredients : [];
-      const instructions = Array.isArray(recipeData.instructions) ? recipeData.instructions : [];
+      // Ensure ingredients and instructions are arrays of strings
+      const ingredients = Array.isArray(recipeData.ingredients) ? recipeData.ingredients as string[] : [];
+      const instructions = Array.isArray(recipeData.instructions) ? recipeData.instructions as string[] : [];
         
       // Construct the data object, omitting optional fields if they are falsy (null, undefined, empty string)
       const dataToCreate: RecipeCreateData = {
         userId: testUserId,
         name: recipeData.name,
-        ingredients: ingredients,
-        instructions: instructions,
+        ingredients,
+        instructions,
       };
       if (recipeData.cuisine) dataToCreate.cuisine = recipeData.cuisine;
       if (recipeData.description) dataToCreate.description = recipeData.description;
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
 
       // Create the new recipe in the database for the test user
       const newRecipe = await prisma.custom_recipes.create({
-        data: dataToCreate as RecipeCreateData
+        data: dataToCreate
       });
       
       // Return the newly created recipe
@@ -190,16 +191,16 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Ensure ingredients and instructions are arrays, default to empty array if not.
-    const ingredients = Array.isArray(recipeData.ingredients) ? recipeData.ingredients : [];
-    const instructions = Array.isArray(recipeData.instructions) ? recipeData.instructions : [];
+    // Ensure ingredients and instructions are arrays of strings
+    const ingredients = Array.isArray(recipeData.ingredients) ? recipeData.ingredients as string[] : [];
+    const instructions = Array.isArray(recipeData.instructions) ? recipeData.instructions as string[] : [];
       
     // Construct the data object, omitting optional fields if they are falsy (null, undefined, empty string)
     const dataToCreate: RecipeCreateData = {
       userId: user.id,
       name: recipeData.name,
-      ingredients: ingredients,
-      instructions: instructions,
+      ingredients,
+      instructions,
     };
     if (recipeData.cuisine) dataToCreate.cuisine = recipeData.cuisine;
     if (recipeData.description) dataToCreate.description = recipeData.description;
@@ -210,7 +211,7 @@ export async function POST(req: NextRequest) {
 
     // Create the new recipe in the database
     const newRecipe = await prisma.custom_recipes.create({
-      data: dataToCreate as RecipeCreateData
+      data: dataToCreate
     });
     
     // Return the newly created recipe
