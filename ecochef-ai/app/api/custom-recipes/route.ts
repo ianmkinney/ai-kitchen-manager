@@ -5,8 +5,46 @@ import { createServerClient } from '../../lib/supabase-server';
 
 const prisma = new PrismaClient();
 
+// Define types for our recipe data
+interface RecipeData {
+  id?: string;
+  name: string;
+  ingredients: string[] | unknown;
+  instructions: string[] | unknown;
+  cuisine?: string;
+  description?: string;
+  difficulty?: string;
+  time?: string;
+}
+
+interface CustomRecipe {
+  id: string;
+  userId: string;
+  name: string;
+  ingredients: unknown;
+  instructions: unknown;
+  cuisine?: string;
+  description?: string;
+  difficulty?: string;
+  time?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Type for recipe creation data
+type RecipeCreateData = {
+  userId: string;
+  name: string;
+  ingredients: string[] | Record<string, unknown>;
+  instructions: string[] | Record<string, unknown>;
+  cuisine?: string;
+  description?: string;
+  difficulty?: string;
+  time?: string;
+}
+
 // GET handler for retrieving all custom recipes for the current user
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     // Initialize Supabase server client
     const supabase = await createServerClient();
@@ -30,10 +68,10 @@ export async function GET(req: NextRequest) {
         ...recipe,
         ingredients: Array.isArray(recipe.ingredients) 
           ? recipe.ingredients 
-          : JSON.parse(recipe.ingredients as any || '[]'),
+          : JSON.parse(recipe.ingredients as string || '[]'),
         instructions: Array.isArray(recipe.instructions) 
           ? recipe.instructions 
-          : JSON.parse(recipe.instructions as any || '[]')
+          : JSON.parse(recipe.instructions as string || '[]')
       }));
       
       // Return the recipes as JSON
@@ -66,10 +104,10 @@ export async function GET(req: NextRequest) {
       ...recipe,
       ingredients: Array.isArray(recipe.ingredients) 
         ? recipe.ingredients 
-        : JSON.parse(recipe.ingredients as any || '[]'),
+        : JSON.parse(recipe.ingredients as string || '[]'),
       instructions: Array.isArray(recipe.instructions) 
         ? recipe.instructions 
-        : JSON.parse(recipe.instructions as any || '[]')
+        : JSON.parse(recipe.instructions as string || '[]')
     }));
     
     // Return the recipes as JSON
@@ -96,7 +134,7 @@ export async function POST(req: NextRequest) {
       const testUserId = supabase.testUser?.id || '00000000-0000-0000-0000-000000000000';
       
       // Parse the request body to get the new recipe data
-      const recipeData = await req.json();
+      const recipeData = await req.json() as RecipeData;
       
       // Validate required fields
       if (!recipeData.name) {
@@ -111,7 +149,7 @@ export async function POST(req: NextRequest) {
       const instructions = Array.isArray(recipeData.instructions) ? recipeData.instructions : [];
         
       // Construct the data object, omitting optional fields if they are falsy (null, undefined, empty string)
-      const dataToCreate: any = {
+      const dataToCreate: RecipeCreateData = {
         userId: testUserId,
         name: recipeData.name,
         ingredients: ingredients,
@@ -126,7 +164,7 @@ export async function POST(req: NextRequest) {
 
       // Create the new recipe in the database for the test user
       const newRecipe = await prisma.custom_recipes.create({
-        data: dataToCreate
+        data: dataToCreate as unknown as any
       });
       
       // Return the newly created recipe
@@ -135,10 +173,10 @@ export async function POST(req: NextRequest) {
           ...newRecipe,
           ingredients: Array.isArray(newRecipe.ingredients) 
             ? newRecipe.ingredients 
-            : JSON.parse(newRecipe.ingredients as any || '[]'),
+            : JSON.parse(newRecipe.ingredients as string || '[]'),
           instructions: Array.isArray(newRecipe.instructions) 
             ? newRecipe.instructions 
-            : JSON.parse(newRecipe.instructions as any || '[]')
+            : JSON.parse(newRecipe.instructions as string || '[]')
         },
         message: 'Recipe created successfully' 
       }, { status: 201 });
@@ -156,7 +194,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Parse the request body to get the new recipe data
-    const recipeData = await req.json();
+    const recipeData = await req.json() as RecipeData;
     
     // Validate required fields
     if (!recipeData.name) {
@@ -171,7 +209,7 @@ export async function POST(req: NextRequest) {
     const instructions = Array.isArray(recipeData.instructions) ? recipeData.instructions : [];
       
     // Construct the data object, omitting optional fields if they are falsy (null, undefined, empty string)
-    const dataToCreate: any = {
+    const dataToCreate: RecipeCreateData = {
       userId: user.id,
       name: recipeData.name,
       ingredients: ingredients,
@@ -186,7 +224,7 @@ export async function POST(req: NextRequest) {
 
     // Create the new recipe in the database
     const newRecipe = await prisma.custom_recipes.create({
-      data: dataToCreate
+      data: dataToCreate as unknown as any
     });
     
     // Return the newly created recipe
@@ -195,10 +233,10 @@ export async function POST(req: NextRequest) {
         ...newRecipe,
         ingredients: Array.isArray(newRecipe.ingredients) 
           ? newRecipe.ingredients 
-          : JSON.parse(newRecipe.ingredients as any || '[]'),
+          : JSON.parse(newRecipe.ingredients as string || '[]'),
         instructions: Array.isArray(newRecipe.instructions) 
           ? newRecipe.instructions 
-          : JSON.parse(newRecipe.instructions as any || '[]')
+          : JSON.parse(newRecipe.instructions as string || '[]')
       },
       message: 'Recipe created successfully' 
     }, { status: 201 });
@@ -224,7 +262,7 @@ export async function PUT(req: NextRequest) {
       const testUserId = supabase.testUser?.id || '00000000-0000-0000-0000-000000000000';
       
       // Parse the request body to get the updated recipe data
-      const recipeData = await req.json();
+      const recipeData = await req.json() as RecipeData;
       
       // Validate required fields
       if (!recipeData.id || !recipeData.name) {
@@ -282,10 +320,10 @@ export async function PUT(req: NextRequest) {
           ...updatedRecipe,
           ingredients: Array.isArray(updatedRecipe.ingredients) 
             ? updatedRecipe.ingredients 
-            : JSON.parse(updatedRecipe.ingredients as any || '[]'),
+            : JSON.parse(updatedRecipe.ingredients as string || '[]'),
           instructions: Array.isArray(updatedRecipe.instructions) 
             ? updatedRecipe.instructions 
-            : JSON.parse(updatedRecipe.instructions as any || '[]')
+            : JSON.parse(updatedRecipe.instructions as string || '[]')
         },
         message: 'Recipe updated successfully' 
       });
@@ -303,7 +341,7 @@ export async function PUT(req: NextRequest) {
     }
     
     // Parse the request body to get the updated recipe data
-    const recipeData = await req.json();
+    const recipeData = await req.json() as RecipeData;
     
     // Validate required fields
     if (!recipeData.id || !recipeData.name) {
@@ -361,10 +399,10 @@ export async function PUT(req: NextRequest) {
         ...updatedRecipe,
         ingredients: Array.isArray(updatedRecipe.ingredients) 
           ? updatedRecipe.ingredients 
-          : JSON.parse(updatedRecipe.ingredients as any || '[]'),
+          : JSON.parse(updatedRecipe.ingredients as string || '[]'),
         instructions: Array.isArray(updatedRecipe.instructions) 
           ? updatedRecipe.instructions 
-          : JSON.parse(updatedRecipe.instructions as any || '[]')
+          : JSON.parse(updatedRecipe.instructions as string || '[]')
       },
       message: 'Recipe updated successfully' 
     });

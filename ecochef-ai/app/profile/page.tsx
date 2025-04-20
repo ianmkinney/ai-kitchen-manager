@@ -31,7 +31,7 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<string | null>(null);
-  const [tempEditValue, setTempEditValue] = useState<any>(null);
+  const [tempEditValue, setTempEditValue] = useState<string | number | string[]>('');
   const [isSaving, setIsSaving] = useState(false);
   
   // Add a ref for the textarea
@@ -129,12 +129,18 @@ export default function ProfilePage() {
 
   const startEditing = (field: string, value: any) => {
     setEditingField(field);
-    setTempEditValue(value);
+    
+    // Handle different types of values appropriately for the form
+    if (typeof value === 'boolean') {
+      setTempEditValue(value ? 'true' : 'false');
+    } else {
+      setTempEditValue(value);
+    }
   };
 
   const cancelEditing = () => {
     setEditingField(null);
-    setTempEditValue(null);
+    setTempEditValue('');
   };
 
   // Function to handle saving edited field
@@ -145,8 +151,23 @@ export default function ProfilePage() {
     try {
       const updatedPreferences = { ...preferences };
       
-      // Update the field with the temporary value
-      updatedPreferences[fieldName as keyof UserPreferences] = tempEditValue;
+      // Process the tempEditValue based on the field type
+      let valueToSave: any;
+      
+      // Handle different data types appropriately
+      if (['isVegetarian', 'isVegan', 'isGlutenFree', 'isDairyFree', 'isNutFree'].includes(fieldName)) {
+        // Convert string 'true'/'false' back to boolean for boolean fields
+        valueToSave = tempEditValue === 'true';
+      } else if (['maxCookingTime', 'peopleCount', 'spicyPreference', 'sweetPreference', 'savoryPreference'].includes(fieldName)) {
+        // Ensure numbers are stored as numbers, not strings
+        valueToSave = typeof tempEditValue === 'string' ? parseInt(tempEditValue, 10) : tempEditValue;
+      } else {
+        // For other fields (strings, arrays) use the value as is
+        valueToSave = tempEditValue;
+      }
+      
+      // Update the preference object with the proper type
+      (updatedPreferences as any)[fieldName] = valueToSave;
       
       // Prepare payload for API
       const payload: any = {};
@@ -154,13 +175,13 @@ export default function ProfilePage() {
       // Map the field names back to the database names
       switch (fieldName) {
         case 'preferredCuisines':
-          payload.cuisinePreferences = tempEditValue;
+          payload.cuisinePreferences = valueToSave;
           break;
         case 'dietGoals':
-          payload.healthGoals = tempEditValue;
+          payload.healthGoals = valueToSave;
           break;
         default:
-          payload[fieldName] = tempEditValue;
+          payload[fieldName] = valueToSave;
       }
       
       // Call API to update preferences
@@ -184,7 +205,7 @@ export default function ProfilePage() {
     } finally {
       setIsSaving(false);
       setEditingField(null);
-      setTempEditValue(null);
+      setTempEditValue('');
     }
   };
 
@@ -246,8 +267,8 @@ export default function ProfilePage() {
                     {isEditing ? (
                       <div className="flex items-center space-x-2">
                         <select 
-                          value={tempEditValue ? 'true' : 'false'} 
-                          onChange={(e) => setTempEditValue(e.target.value === 'true')}
+                          value={typeof tempEditValue === 'string' ? tempEditValue : 'false'} 
+                          onChange={(e) => setTempEditValue(e.target.value)}
                           className="border rounded p-1 text-sm"
                           autoFocus
                         >

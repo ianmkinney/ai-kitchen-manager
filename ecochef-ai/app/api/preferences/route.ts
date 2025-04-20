@@ -2,6 +2,37 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '../../lib/supabase-server';
 import { cookies } from 'next/headers';
 
+// Define interfaces for preferences data
+interface UserPreferences {
+  userid: string;
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
+  isDairyFree?: boolean;
+  isNutFree?: boolean;
+  spicyPreference?: number;
+  sweetPreference?: number;
+  savoryPreference?: number;
+  maxCookingTime?: number;
+  cookingSkillLevel?: string;
+  peopleCount?: number;
+  cuisine?: string;
+  cuisinePreferences?: unknown;
+  flavorPreferences?: unknown;
+  healthGoals?: unknown;
+  allergies?: unknown;
+  sustainabilityPreference?: string;
+  nutritionFocus?: unknown;
+  calorieTarget?: number;
+  proteinTarget?: number;
+  carbTarget?: number;
+  fatTarget?: number;
+  dietaryNotes?: string;
+  rawQuizAnswers?: unknown;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 async function getUserIdFromAuthUsers(email: string) {
   // Special case for test user
   if (email === 'test@ecochef.demo') {
@@ -152,7 +183,7 @@ export async function POST(request: Request) {
     // Determine if this is a full update or a partial update
     const isPartialUpdate = Object.keys(preferencesData).length < 10; // If fewer fields, likely a partial update
 
-    let finalData: any;
+    let finalData: UserPreferences;
 
     if (existingPrefs && isPartialUpdate) {
       // For partial updates, merge the new data with existing data
