@@ -13,13 +13,6 @@ interface PantryItem {
   updatedAt: string;
 }
 
-// Define recipe interface
-interface Recipe {
-  name: string;
-  ingredients: string[];
-  instructions: string[];
-}
-
 // Define shopping suggestion interfaces
 interface ShoppingItemSuggestion {
   name: string;
@@ -45,7 +38,6 @@ export default function Pantry() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newPantryItem, setNewPantryItem] = useState('');
-  const [recipes, setRecipes] = useState<Recipe[]>([]); // Add state for recipes
 
   // Load pantry items on component mount
   useEffect(() => {
@@ -203,30 +195,6 @@ export default function Pantry() {
     }
   };
 
-  // Fetch and display recipes
-  const getRecipes = async () => {
-    try {
-      setIsGenerating(true);
-      const response = await fetch('/api/recipes/suggestions', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRecipes(data); // Store recipes in state
-      } else {
-        console.error('Error fetching recipes:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Error fetching recipes:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -254,9 +222,9 @@ export default function Pantry() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Inventory Section */}
-        <section className="card md:col-span-2">
+        <section className="card md:col-span-1">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">My Pantry</h2>
             {pantryItems.length > 0 && (
@@ -374,50 +342,6 @@ export default function Pantry() {
               <p className="text-gray-500 text-center mt-32">
                 {error ? 'Please fix the database setup first.' 
                   : 'Click the button above to get AI shopping suggestions'}
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* AI Recipe Suggestions */}
-        <section className="card">
-          <h2 className="text-xl font-semibold mb-4">AI Recipe Suggestions</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Get personalized recipe suggestions based on your pantry items.
-          </p>
-
-          <button
-            className={`btn-primary w-full mb-4 ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={getRecipes}
-            disabled={isGenerating || pantryItems.length === 0 || !!error}
-          >
-            {isGenerating ? 'Fetching Recipes...' : 'Get Recipe Suggestions'}
-          </button>
-
-          <div className="bg-gray-50 rounded-lg p-4 min-h-[300px] overflow-y-auto">
-            {recipes.length > 0 ? (
-              <ul className="space-y-4">
-                {recipes.map((recipe, index) => (
-                  <li key={index} className="p-4 border bg-white rounded-lg shadow-sm">
-                    <h3 className="text-lg font-bold mb-2">{recipe.name}</h3>
-                    <p className="text-sm font-semibold">Ingredients:</p>
-                    <ul className="list-disc list-inside mb-2">
-                      {recipe.ingredients && recipe.ingredients.map((ingredient, i) => (
-                        <li key={i}>{ingredient}</li>
-                      ))}
-                    </ul>
-                    <p className="text-sm font-semibold">Instructions:</p>
-                    <ol className="list-decimal list-inside">
-                      {recipe.instructions && recipe.instructions.map((instruction, i) => (
-                        <li key={i}>{instruction}</li>
-                      ))}
-                    </ol>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500 text-center mt-32">
-                {error ? 'Please fix the database setup first.' : 'Click the button above to get recipe suggestions'}
               </p>
             )}
           </div>

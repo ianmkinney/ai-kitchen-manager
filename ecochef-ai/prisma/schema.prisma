@@ -324,6 +324,7 @@ model users {
   user_preferences_user_preferences_userIdTousers user_preferences[] @relation("user_preferences_userIdTousers")
   user_preferences_user_preferences_useridTousers user_preferences?  @relation("user_preferences_useridTousers")
   weekly_plans                                    weekly_plans[]
+  custom_recipes                                  custom_recipes[]
 
   @@index([instance_id])
   @@index([is_anonymous])
@@ -501,6 +502,25 @@ model ShoppingListItem {
 
   @@index([userId], map: "idx_shopping_list_items_user_id")
   @@index([category], map: "idx_shopping_list_items_category")
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model custom_recipes {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String    @db.Uuid
+  name         String
+  ingredients  Json      @default("[]")
+  instructions Json      @default("[]")
+  cuisine      String?
+  description  String?
+  difficulty   String?
+  time         String?
+  createdAt    DateTime? @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime? @default(now()) @db.Timestamptz(6)
+  users        users     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId], map: "idx_custom_recipes_user_id")
   @@schema("public")
 }
 

@@ -137,9 +137,10 @@ export async function POST(request: Request) {
     const userId = await getUserIdFromAuthUsers(userEmail);
     console.log('Using user ID for preferences:', userId);
 
+    // First, check if we have existing preferences
     const { data: existingPrefs, error: queryError } = await supabase
       .from('user_preferences')
-      .select('id')
+      .select('*')  // Select all columns so we can merge with new data
       .eq('userid', userId)
       .single();
 
@@ -148,84 +149,61 @@ export async function POST(request: Request) {
       throw queryError;
     }
 
-    if (existingPrefs) {
-      const { error: deleteError } = await supabase
-        .from('user_preferences')
-        .delete()
-        .eq('userid', userId);
+    // Determine if this is a full update or a partial update
+    const isPartialUpdate = Object.keys(preferencesData).length < 10; // If fewer fields, likely a partial update
 
-      if (deleteError) {
-        console.error('Error deleting existing preferences:', deleteError);
-        throw deleteError;
+    let finalData: any;
+
+    if (existingPrefs && isPartialUpdate) {
+      // For partial updates, merge the new data with existing data
+      console.log('Performing partial update for user', userId);
+      finalData = { ...existingPrefs, ...preferencesData, updatedAt: new Date().toISOString() };
+    } else {
+      // For a complete update or new record, use the standard approach
+      // Filter out any properties that don't match the database schema
+      // Only include known valid columns
+      finalData = {
+        userid: userId,
+        isVegetarian: preferencesData.isVegetarian !== undefined ? preferencesData.isVegetarian : (existingPrefs?.isVegetarian || false),
+        isVegan: preferencesData.isVegan !== undefined ? preferencesData.isVegan : (existingPrefs?.isVegan || false),
+        isGlutenFree: preferencesData.isGlutenFree !== undefined ? preferencesData.isGlutenFree : (existingPrefs?.isGlutenFree || false),
+        isDairyFree: preferencesData.isDairyFree !== undefined ? preferencesData.isDairyFree : (existingPrefs?.isDairyFree || false),
+        isNutFree: preferencesData.isNutFree !== undefined ? preferencesData.isNutFree : (existingPrefs?.isNutFree || false),
+        spicyPreference: preferencesData.spicyPreference !== undefined ? preferencesData.spicyPreference : (existingPrefs?.spicyPreference || 5),
+        sweetPreference: preferencesData.sweetPreference !== undefined ? preferencesData.sweetPreference : (existingPrefs?.sweetPreference || 5),
+        savoryPreference: preferencesData.savoryPreference !== undefined ? preferencesData.savoryPreference : (existingPrefs?.savoryPreference || 5),
+        maxCookingTime: preferencesData.maxCookingTime !== undefined ? preferencesData.maxCookingTime : (existingPrefs?.maxCookingTime || 30),
+        cookingSkillLevel: preferencesData.cookingSkillLevel !== undefined ? preferencesData.cookingSkillLevel : (existingPrefs?.cookingSkillLevel || 'intermediate'),
+        peopleCount: preferencesData.peopleCount !== undefined ? preferencesData.peopleCount : (existingPrefs?.peopleCount || 1),
+        cuisine: preferencesData.cuisine !== undefined ? preferencesData.cuisine : (existingPrefs?.cuisine || 'Any'),
+        cuisinePreferences: preferencesData.cuisinePreferences !== undefined ? preferencesData.cuisinePreferences : (existingPrefs?.cuisinePreferences || []),
+        flavorPreferences: preferencesData.flavorPreferences !== undefined ? preferencesData.flavorPreferences : (existingPrefs?.flavorPreferences || []),
+        healthGoals: preferencesData.healthGoals !== undefined ? preferencesData.healthGoals : (existingPrefs?.healthGoals || []),
+        allergies: preferencesData.allergies !== undefined ? preferencesData.allergies : (existingPrefs?.allergies || []),
+        sustainabilityPreference: preferencesData.sustainabilityPreference !== undefined ? preferencesData.sustainabilityPreference : (existingPrefs?.sustainabilityPreference || 'medium'),
+        nutritionFocus: preferencesData.nutritionFocus !== undefined ? preferencesData.nutritionFocus : (existingPrefs?.nutritionFocus || []),
+        calorieTarget: preferencesData.calorieTarget !== undefined ? preferencesData.calorieTarget : existingPrefs?.calorieTarget,
+        proteinTarget: preferencesData.proteinTarget !== undefined ? preferencesData.proteinTarget : existingPrefs?.proteinTarget,
+        carbTarget: preferencesData.carbTarget !== undefined ? preferencesData.carbTarget : existingPrefs?.carbTarget,
+        fatTarget: preferencesData.fatTarget !== undefined ? preferencesData.fatTarget : existingPrefs?.fatTarget,
+        dietaryNotes: preferencesData.dietaryNotes !== undefined ? preferencesData.dietaryNotes : (existingPrefs?.dietaryNotes || ''),
+        rawQuizAnswers: preferencesData.rawQuizAnswers !== undefined ? preferencesData.rawQuizAnswers : (existingPrefs?.rawQuizAnswers || {}),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (!existingPrefs) {
+        finalData.createdAt = new Date().toISOString();
+      } else if (existingPrefs.createdAt) {
+        finalData.createdAt = existingPrefs.createdAt;
       }
     }
 
-    // Filter out any properties that don't match the database schema
-    // Only include known valid columns
-    const validData: {
-      userid: string;
-      isVegetarian: boolean | null;
-      isVegan: boolean | null;
-      isGlutenFree: boolean | null;
-      isDairyFree: boolean | null;
-      isNutFree: boolean | null;
-      spicyPreference: number | null;
-      sweetPreference: number | null;
-      savoryPreference: number | null;
-      maxCookingTime: number | null;
-      cookingSkillLevel: string | null;
-      peopleCount: number | null;
-      cuisine: string;
-      cuisinePreferences: string[] | null;
-      flavorPreferences: string[] | null;
-      healthGoals: string[] | null;
-      allergies: string[] | null;
-      sustainabilityPreference: string | null;
-      nutritionFocus: string[] | null;
-      calorieTarget?: number | null;
-      proteinTarget?: number | null;
-      carbTarget?: number | null;
-      fatTarget?: number | null;
-      rawQuizAnswers?: Record<string, unknown>;
-      updatedAt: string;
-      createdAt?: string;
-    } = {
-      userid: userId,
-      isVegetarian: preferencesData.isVegetarian || false,
-      isVegan: preferencesData.isVegan || false,
-      isGlutenFree: preferencesData.isGlutenFree || false,
-      isDairyFree: preferencesData.isDairyFree || false,
-      isNutFree: preferencesData.isNutFree || false,
-      spicyPreference: preferencesData.spicyPreference || 5,
-      sweetPreference: preferencesData.sweetPreference || 5,
-      savoryPreference: preferencesData.savoryPreference || 5,
-      maxCookingTime: preferencesData.maxCookingTime || 30,
-      cookingSkillLevel: preferencesData.cookingSkillLevel || 'intermediate',
-      peopleCount: preferencesData.peopleCount || 1,
-      cuisine: preferencesData.cuisine || 'Any',
-      cuisinePreferences: preferencesData.cuisinePreferences || [],
-      flavorPreferences: preferencesData.flavorPreferences || [],
-      healthGoals: preferencesData.healthGoals || [],
-      allergies: preferencesData.allergies || [],
-      sustainabilityPreference: preferencesData.sustainabilityPreference || 'medium',
-      nutritionFocus: preferencesData.nutritionFocus || [],
-      calorieTarget: preferencesData.calorieTarget,
-      proteinTarget: preferencesData.proteinTarget,
-      carbTarget: preferencesData.carbTarget,
-      fatTarget: preferencesData.fatTarget,
-      rawQuizAnswers: preferencesData.rawQuizAnswers || {},
-      updatedAt: new Date().toISOString()
-    };
+    console.log('Saving preferences data:', JSON.stringify(finalData, null, 2));
 
-    if (!existingPrefs) {
-      validData.createdAt = new Date().toISOString();
-    }
-
-    console.log('Saving filtered preferences data:', JSON.stringify(validData, null, 2));
-
+    // Use upsert to insert or update the record without deleting first
     const { data, error } = await supabase
       .from('user_preferences')
-      .upsert(validData)
+      .upsert(finalData)
       .select()
       .single();
 

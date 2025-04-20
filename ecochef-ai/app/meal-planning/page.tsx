@@ -210,6 +210,9 @@ export default function MealPlanning() {
     cuisine: 'Any',
   });
 
+  // State for custom recipes
+  const [customRecipes, setCustomRecipes] = useState<Recipe[]>([]);
+
   // Initialize the weekly plan with empty arrays for each meal type
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan>({
     Mon: { breakfast: [], lunch: [], dinner: [] },
@@ -446,6 +449,33 @@ export default function MealPlanning() {
       setPantryItems([]);
     }
   };
+
+  // Fetch custom recipes from database API
+  const fetchCustomRecipes = async () => {
+    try {
+      const response = await fetch('/api/custom-recipes');
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Format custom recipes to match the Recipe interface expected by the meal planning page
+        const formattedRecipes = data.customRecipes.map((recipe: any) => ({
+          name: recipe.name,
+          ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+          instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+          isCustom: true
+        }));
+        
+        setCustomRecipes(formattedRecipes);
+      }
+    } catch (error) {
+      console.error('Error fetching custom recipes:', error);
+    }
+  };
+
+  // Load custom recipes on component mount
+  useEffect(() => {
+    fetchCustomRecipes();
+  }, []);
 
   // Handle preference changes
   const handlePreferenceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -966,21 +996,52 @@ No extra text or formatting.`,
                     ></div>
                   </div>
                 )}
-                <div>
-                  {loadingProgress === 100 && aiResponse.otherContent && aiResponse.otherContent.length > 0 && (
-                    <div className="text-sm text-gray-600 mb-4">
-                      {aiResponse.otherContent.map((content, index) => (
-                        <p key={index} className="mb-2">{content}</p>
+                
+                {/* Custom Recipes Section */}
+                {customRecipes.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-md font-medium mb-2">Your Custom Recipes</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {customRecipes.map((recipe, index) => (
+                        <DraggableRecipe key={`custom-${index}`} recipe={recipe} />
                       ))}
                     </div>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Array.isArray(aiResponse.meals) && aiResponse.meals.length > 0 &&
-                      aiResponse.meals.map((recipe, index) => (
-                        <DraggableRecipe key={index} recipe={recipe} />
-                      ))}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Drag and drop to add to your meal plan
+                    </p>
                   </div>
-                </div>
+                )}
+                
+                {/* Link to create custom recipes if none exist */}
+                {customRecipes.length === 0 && !isLoading && (
+                  <div className="mt-2 mb-2">
+                    <p className="text-sm text-gray-600">
+                      <Link href="/recipes" className="text-blue-600 hover:text-blue-800">
+                        Create custom recipes
+                      </Link> to see them here and add to your meal plan.
+                    </p>
+                  </div>
+                )}
+                
+                {/* AI Generated Recipes Section */}
+                {Array.isArray(aiResponse.meals) && aiResponse.meals.length > 0 && (
+                  <div>
+                    <h3 className="text-md font-medium mb-2">AI Generated Recipes</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {aiResponse.meals.map((recipe, index) => (
+                        <DraggableRecipe key={`ai-${index}`} recipe={recipe} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {loadingProgress === 100 && aiResponse.otherContent && aiResponse.otherContent.length > 0 && (
+                  <div className="text-sm text-gray-600 mb-4">
+                    {aiResponse.otherContent.map((content, index) => (
+                      <p key={index} className="mb-2">{content}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
             <section className="card">

@@ -2,6 +2,7 @@
 DROP TABLE IF EXISTS weekly_plan_recipes;
 DROP TABLE IF EXISTS weekly_plans;
 DROP TABLE IF EXISTS recipes;
+DROP TABLE IF EXISTS custom_recipes;
 DROP TABLE IF EXISTS pantry_items;
 DROP TABLE IF EXISTS user_preferences;
 DROP TABLE IF EXISTS shopping_list;
@@ -43,6 +44,7 @@ CREATE TABLE user_preferences (
   "proteinTarget" INTEGER,
   "carbTarget" INTEGER,
   "fatTarget" INTEGER,
+  "dietaryNotes" TEXT DEFAULT '',
   "rawQuizAnswers" JSONB DEFAULT '{}'::JSONB,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -102,6 +104,21 @@ CREATE TABLE shopping_list (
   quantity REAL,
   unit TEXT,
   completed BOOLEAN DEFAULT FALSE,
+  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create custom_recipes table
+CREATE TABLE custom_recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID REFERENCES "User"(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  ingredients JSONB DEFAULT '[]'::JSONB,
+  instructions JSONB DEFAULT '[]'::JSONB,
+  cuisine TEXT,
+  description TEXT,
+  difficulty TEXT,
+  time TEXT,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -200,4 +217,9 @@ CREATE POLICY weekly_plan_recipes_self_access ON weekly_plan_recipes
 -- RLS for shopping_list table
 ALTER TABLE shopping_list ENABLE ROW LEVEL SECURITY;
 CREATE POLICY shopping_list_self_access ON shopping_list
-  USING (userid = auth.uid() OR userid = '00000000-0000-0000-0000-000000000000'); 
+  USING (userid = auth.uid() OR userid = '00000000-0000-0000-0000-000000000000');
+  
+-- RLS for custom_recipes table
+ALTER TABLE custom_recipes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY custom_recipes_self_access ON custom_recipes
+  USING ("userId" = auth.uid() OR "userId" = '00000000-0000-0000-0000-000000000000');

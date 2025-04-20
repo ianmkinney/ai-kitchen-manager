@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../lib/auth-context';
 
@@ -20,6 +20,7 @@ interface UserPreferences {
   spicyPreference: number;
   sweetPreference: number;
   savoryPreference: number;
+  dietaryNotes: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +30,12 @@ export default function ProfilePage() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [tempEditValue, setTempEditValue] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Add a ref for the textarea
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     // Fetch user preferences from API
@@ -43,12 +50,9 @@ export default function ProfilePage() {
       }
       
       try {
-        // Use the API endpoint instead of directly querying Supabase
-        // This handles test users correctly via the server-side cookies
         const response = await fetch('/api/preferences');
         
         if (!response.ok) {
-          // Handle HTTP errors
           if (response.status === 401) {
             setError('You are not authorized to view these preferences');
             setIsLoading(false);
@@ -90,6 +94,7 @@ export default function ProfilePage() {
           spicyPreference: data.spicyPreference || 5,
           sweetPreference: data.sweetPreference || 5, 
           savoryPreference: data.savoryPreference || 5,
+          dietaryNotes: data.dietaryNotes || '',
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString()
         };
@@ -120,6 +125,67 @@ export default function ProfilePage() {
   // Helper function to format booleans for display
   const formatBoolean = (value: boolean | undefined) => {
     return value ? 'Yes' : 'No';
+  };
+
+  const startEditing = (field: string, value: any) => {
+    setEditingField(field);
+    setTempEditValue(value);
+  };
+
+  const cancelEditing = () => {
+    setEditingField(null);
+    setTempEditValue(null);
+  };
+
+  // Function to handle saving edited field
+  const handleSaveField = async (fieldName: string) => {
+    if (!preferences) return;
+    
+    setIsSaving(true);
+    try {
+      const updatedPreferences = { ...preferences };
+      
+      // Update the field with the temporary value
+      updatedPreferences[fieldName as keyof UserPreferences] = tempEditValue;
+      
+      // Prepare payload for API
+      const payload: any = {};
+      
+      // Map the field names back to the database names
+      switch (fieldName) {
+        case 'preferredCuisines':
+          payload.cuisinePreferences = tempEditValue;
+          break;
+        case 'dietGoals':
+          payload.healthGoals = tempEditValue;
+          break;
+        default:
+          payload[fieldName] = tempEditValue;
+      }
+      
+      // Call API to update preferences
+      const response = await fetch('/api/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update preferences');
+      }
+      
+      // Update local state
+      setPreferences(updatedPreferences);
+    } catch (error) {
+      console.error('Error updating preference:', error);
+      alert('Failed to update preference. Please try again.');
+    } finally {
+      setIsSaving(false);
+      setEditingField(null);
+      setTempEditValue(null);
+    }
   };
 
   if (!user) {
@@ -168,29 +234,96 @@ export default function ProfilePage() {
           <section className="card">
             <h2 className="text-xl font-semibold mb-4">Dietary Restrictions</h2>
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Vegetarian:</span>
-                <span className="font-medium">{formatBoolean(preferences.isVegetarian)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Vegan:</span>
-                <span className="font-medium">{formatBoolean(preferences.isVegan)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Gluten-Free:</span>
-                <span className="font-medium">{formatBoolean(preferences.isGlutenFree)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Dairy-Free:</span>
-                <span className="font-medium">{formatBoolean(preferences.isDairyFree)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Nut-Free:</span>
-                <span className="font-medium">{formatBoolean(preferences.isNutFree)}</span>
-              </div>
-              <div className="flex justify-between">
+              {/* Boolean fields */}
+              {['isVegetarian', 'isVegan', 'isGlutenFree', 'isDairyFree', 'isNutFree'].map(field => {
+                const label = field.replace('is', '').replace(/([A-Z])/g, ' $1').trim();
+                const isEditing = editingField === field;
+                const fieldValue = preferences[field as keyof UserPreferences] as boolean;
+                
+                return (
+                  <div key={field} className="flex justify-between items-center">
+                    <span className="text-gray-600">{label}:</span>
+                    {isEditing ? (
+                      <div className="flex items-center space-x-2">
+                        <select 
+                          value={tempEditValue ? 'true' : 'false'} 
+                          onChange={(e) => setTempEditValue(e.target.value === 'true')}
+                          className="border rounded p-1 text-sm"
+                          autoFocus
+                        >
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                        <button 
+                          onClick={() => handleSaveField(field)}
+                          disabled={isSaving}
+                          className="text-green-600 hover:text-green-800 ml-2"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          onClick={cancelEditing}
+                          className="text-gray-600 hover:text-gray-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <span className="font-medium">{formatBoolean(fieldValue)}</span>
+                        <button 
+                          onClick={() => startEditing(field, fieldValue)}
+                          className="ml-2 text-gray-500 hover:text-gray-700"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              
+              {/* Arrays field */}
+              <div className="flex justify-between items-center">
                 <span className="text-gray-600">Allergies:</span>
-                <span className="font-medium">{formatArrayForDisplay(preferences.allergies)}</span>
+                {editingField === 'allergies' ? (
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="text" 
+                      value={Array.isArray(tempEditValue) ? tempEditValue.join(', ') : ''}
+                      onChange={(e) => setTempEditValue(e.target.value.split(',').map(item => item.trim()))}
+                      className="border rounded p-1 text-sm"
+                      autoFocus
+                    />
+                    <button 
+                      onClick={() => handleSaveField('allergies')}
+                      disabled={isSaving}
+                      className="text-green-600 hover:text-green-800 ml-2"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={cancelEditing}
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <span className="font-medium">{formatArrayForDisplay(preferences.allergies)}</span>
+                    <button 
+                      onClick={() => startEditing('allergies', preferences.allergies)}
+                      className="ml-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -198,17 +331,99 @@ export default function ProfilePage() {
           <section className="card">
             <h2 className="text-xl font-semibold mb-4">Cooking Preferences</h2>
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Max Cooking Time:</span>
-                <span className="font-medium">{preferences.maxCookingTime} minutes</span>
-              </div>
-              <div className="flex justify-between">
+              {/* Number fields */}
+              {[
+                { field: 'maxCookingTime', label: 'Max Cooking Time (minutes)' },
+                { field: 'peopleCount', label: 'Serving Size (people)' }
+              ].map(item => {
+                const isEditing = editingField === item.field;
+                const fieldValue = preferences[item.field as keyof UserPreferences] as number;
+                
+                return (
+                  <div key={item.field} className="flex justify-between items-center">
+                    <span className="text-gray-600">{item.label}:</span>
+                    {isEditing ? (
+                      <div className="flex items-center space-x-2">
+                        <input 
+                          type="number" 
+                          value={tempEditValue}
+                          onChange={(e) => setTempEditValue(parseInt(e.target.value))}
+                          className="border rounded p-1 text-sm w-20"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => handleSaveField(item.field)}
+                          disabled={isSaving}
+                          className="text-green-600 hover:text-green-800 ml-2"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          onClick={cancelEditing}
+                          className="text-gray-600 hover:text-gray-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <span className="font-medium">{fieldValue}</span>
+                        <button 
+                          onClick={() => startEditing(item.field, fieldValue)}
+                          className="ml-2 text-gray-500 hover:text-gray-700"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              
+              {/* Text field */}
+              <div className="flex justify-between items-center">
                 <span className="text-gray-600">Cooking Skill:</span>
-                <span className="font-medium">{preferences.cookingSkillLevel}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Serving Size:</span>
-                <span className="font-medium">{preferences.peopleCount} people</span>
+                {editingField === 'cookingSkillLevel' ? (
+                  <div className="flex items-center space-x-2">
+                    <select
+                      value={tempEditValue}
+                      onChange={(e) => setTempEditValue(e.target.value)}
+                      className="border rounded p-1 text-sm"
+                      autoFocus
+                    >
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                    <button 
+                      onClick={() => handleSaveField('cookingSkillLevel')}
+                      disabled={isSaving}
+                      className="text-green-600 hover:text-green-800 ml-2"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={cancelEditing}
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <span className="font-medium">{preferences.cookingSkillLevel}</span>
+                    <button 
+                      onClick={() => startEditing('cookingSkillLevel', preferences.cookingSkillLevel)}
+                      className="ml-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -216,61 +431,215 @@ export default function ProfilePage() {
           <section className="card">
             <h2 className="text-xl font-semibold mb-4">Flavor & Cuisine Preferences</h2>
             <div className="space-y-3">
-              <div className="flex flex-col">
+              {/* Arrays field */}
+              <div className="flex justify-between items-center">
                 <span className="text-gray-600">Preferred Cuisines:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.preferredCuisines)}</span>
+                {editingField === 'preferredCuisines' ? (
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="text" 
+                      value={Array.isArray(tempEditValue) ? tempEditValue.join(', ') : ''}
+                      onChange={(e) => setTempEditValue(e.target.value.split(',').map(item => item.trim()))}
+                      className="border rounded p-1 text-sm"
+                      autoFocus
+                    />
+                    <button 
+                      onClick={() => handleSaveField('preferredCuisines')}
+                      disabled={isSaving}
+                      className="text-green-600 hover:text-green-800 ml-2"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={cancelEditing}
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <span className="font-medium">{formatArrayForDisplay(preferences.preferredCuisines)}</span>
+                    <button 
+                      onClick={() => startEditing('preferredCuisines', preferences.preferredCuisines)}
+                      className="ml-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Spicy Preference:</span>
-                <span className="font-medium">{preferences.spicyPreference}/10</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Sweet Preference:</span>
-                <span className="font-medium">{preferences.sweetPreference}/10</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Savory Preference:</span>
-                <span className="font-medium">{preferences.savoryPreference}/10</span>
-              </div>
+              
+              {/* Number fields */}
+              {[
+                { field: 'spicyPreference', label: 'Spicy Preference (1-10)' },
+                { field: 'sweetPreference', label: 'Sweet Preference (1-10)' },
+                { field: 'savoryPreference', label: 'Savory Preference (1-10)' }
+              ].map(item => {
+                const isEditing = editingField === item.field;
+                const fieldValue = preferences[item.field as keyof UserPreferences] as number;
+                
+                return (
+                  <div key={item.field} className="flex justify-between items-center">
+                    <span className="text-gray-600">{item.label}:</span>
+                    {isEditing ? (
+                      <div className="flex items-center space-x-2">
+                        <input 
+                          type="number" 
+                          value={tempEditValue}
+                          onChange={(e) => setTempEditValue(parseInt(e.target.value))}
+                          min={1}
+                          max={10}
+                          className="border rounded p-1 text-sm w-20"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => handleSaveField(item.field)}
+                          disabled={isSaving}
+                          className="text-green-600 hover:text-green-800 ml-2"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          onClick={cancelEditing}
+                          className="text-gray-600 hover:text-gray-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <span className="font-medium">{fieldValue}/10</span>
+                        <button 
+                          onClick={() => startEditing(item.field, fieldValue)}
+                          className="ml-2 text-gray-500 hover:text-gray-700"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
 
           <section className="card">
             <h2 className="text-xl font-semibold mb-4">Health & Nutrition</h2>
             <div className="space-y-3">
-              <div className="flex flex-col">
+              {/* Arrays field */}
+              <div className="flex justify-between items-center">
                 <span className="text-gray-600">Health Goals:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.dietGoals)}</span>
+                {editingField === 'dietGoals' ? (
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="text" 
+                      value={Array.isArray(tempEditValue) ? tempEditValue.join(', ') : ''}
+                      onChange={(e) => setTempEditValue(e.target.value.split(',').map(item => item.trim()))}
+                      className="border rounded p-1 text-sm"
+                      autoFocus
+                    />
+                    <button 
+                      onClick={() => handleSaveField('dietGoals')}
+                      disabled={isSaving}
+                      className="text-green-600 hover:text-green-800 ml-2"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={cancelEditing}
+                      className="text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <span className="font-medium">{formatArrayForDisplay(preferences.dietGoals)}</span>
+                    <button 
+                      onClick={() => startEditing('dietGoals', preferences.dietGoals)}
+                      className="ml-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
+            </div>
+          </section>
+
+          <section className="col-span-1 md:col-span-2 card">
+            <h2 className="text-xl font-semibold mb-4">Additional Dietary Notes</h2>
+            <div className="space-y-3">
+              {/* Textarea field */}
               <div className="flex flex-col">
-                <span className="text-gray-600">Allergies:</span>
-                <span className="font-medium mt-1">{formatArrayForDisplay(preferences.allergies)}</span>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600">Notes:</span>
+                  {editingField !== 'dietaryNotes' && (
+                    <button 
+                      onClick={() => startEditing('dietaryNotes', preferences.dietaryNotes)}
+                      className="ml-2 text-gray-500 hover:text-gray-700"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                
+                {editingField === 'dietaryNotes' ? (
+                  <div className="w-full">
+                    <textarea
+                      ref={textareaRef}
+                      value={tempEditValue || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTempEditValue(value);
+                      }}
+                      className="border rounded p-2 text-base w-full"
+                      rows={6}
+                      autoFocus
+                    />
+                    <div className="flex justify-end mt-2 space-x-2">
+                      <button 
+                        onClick={() => handleSaveField('dietaryNotes')}
+                        disabled={isSaving}
+                        className="text-green-600 hover:text-green-800 px-2 py-1 text-sm border border-green-600 rounded"
+                      >
+                        Save
+                      </button>
+                      <button 
+                        onClick={cancelEditing}
+                        className="text-gray-600 hover:text-gray-800 px-2 py-1 text-sm border border-gray-300 rounded"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full bg-gray-50 p-3 rounded-lg min-h-[80px] whitespace-pre-wrap">
+                    {preferences.dietaryNotes ? preferences.dietaryNotes : 
+                      <span className="text-gray-400">No additional dietary notes provided</span>
+                    }
+                  </div>
+                )}
+                <p className="text-sm text-gray-500 mt-2">
+                  Use this space to add any additional dietary information or preferences not covered by the quiz.
+                  This information will be used to personalize your recipe suggestions.
+                </p>
               </div>
             </div>
           </section>
 
           <section className="col-span-1 md:col-span-2 card">
             <h2 className="text-xl font-semibold mb-4">Your AI-Powered Nutrition Insights</h2>
-            <p className="text-gray-600">
-              Based on your preferences, we recommend focusing on meals that are:
-            </p>
-            <ul className="list-disc pl-5 mt-2 space-y-1">
-              {preferences.isVegetarian && <li>Rich in plant-based proteins like legumes and tofu</li>}
-              {preferences.isGlutenFree && <li>Centered around naturally gluten-free grains like rice and quinoa</li>}
-              {preferences.isDairyFree && <li>Using nutritious dairy alternatives like almond or oat milk</li>}
-              {preferences.dietGoals?.includes('weight-loss') && <li>Lower in calories but high in nutrients</li>}
-              {preferences.dietGoals?.includes('muscle-gain') && <li>Higher in protein with complex carbohydrates</li>}
-              {preferences.dietGoals?.includes('energy') && <li>Balanced with complex carbs for sustained energy</li>}
-              {preferences.spicyPreference > 7 && <li>More flavorful with spicy elements</li>}
-              {preferences.sweetPreference > 7 && <li>Including moderate amounts of natural sweetness</li>}
-              <li>Quick to prepare (under {preferences.maxCookingTime} minutes)</li>
-              <li>Suitable for your {preferences.cookingSkillLevel} cooking skill level</li>
-            </ul>
-            <div className="mt-6">
-              <Link href="/meal-planning" className="btn-secondary">
-                Get Personalized Meal Plans
-              </Link>
-            </div>
+            {/* ...existing code... */}
           </section>
         </div>
       ) : null}
