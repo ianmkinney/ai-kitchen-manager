@@ -17,20 +17,6 @@ interface RecipeData {
   time?: string;
 }
 
-interface CustomRecipe {
-  id: string;
-  userId: string;
-  name: string;
-  ingredients: unknown;
-  instructions: unknown;
-  cuisine?: string;
-  description?: string;
-  difficulty?: string;
-  time?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 // Type for recipe creation data
 type RecipeCreateData = {
   userId: string;
