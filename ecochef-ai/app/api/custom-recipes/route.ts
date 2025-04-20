@@ -2,20 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { createServerClient } from '../../lib/supabase-server';
-
-// Create a singleton for PrismaClient to handle connections better in serverless environments
-// This helps prevent connection pool exhaustion in production
-let prisma: PrismaClient;
-
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient();
-} else {
-  // In development, use a global variable to prevent multiple instances during hot-reloading
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
-  }
-  prisma = global.prisma;
-}
+import { prisma } from '../../lib/db'; // Import the singleton Prisma instance
 
 // Define types for our recipe data
 interface RecipeData {
