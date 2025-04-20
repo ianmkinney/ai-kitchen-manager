@@ -1,6 +1,5 @@
 // filepath: c:\Users\Katie\OneDrive\Desktop\Ian's Stuff\ai-kitchen-manager\ecochef-ai\app\api\custom-recipes\route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { createServerClient } from '../../lib/supabase-server';
 import { prisma } from '../../lib/db'; // Import the singleton Prisma instance
 
