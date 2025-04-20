@@ -45,7 +45,7 @@ const mockCustomRecipes = [
 ];
 
 // Helper function to safely parse JSON from database
-function safeParseJson(value: any, defaultValue: any[] = []): any[] {
+function safeParseJson(value: unknown, defaultValue: string[] = []): string[] {
   if (Array.isArray(value)) {
     return value;
   }
@@ -190,8 +190,8 @@ export async function POST(req: NextRequest) {
       }
       
       // Ensure ingredients and instructions are arrays of strings
-      let ingredients = safeParseJson(recipeData.ingredients);
-      let instructions = safeParseJson(recipeData.instructions);
+      const ingredients = safeParseJson(recipeData.ingredients);
+      const instructions = safeParseJson(recipeData.instructions);
       
       // Prepare data to insert
       const newRecipeData = {
@@ -259,8 +259,8 @@ export async function POST(req: NextRequest) {
     }
     
     // Ensure ingredients and instructions are arrays of strings
-    let ingredients = safeParseJson(recipeData.ingredients);
-    let instructions = safeParseJson(recipeData.instructions);
+    const ingredients = safeParseJson(recipeData.ingredients);
+    const instructions = safeParseJson(recipeData.instructions);
     
     // Prepare data to insert
     const newRecipeData = {
@@ -361,8 +361,8 @@ export async function PUT(req: NextRequest) {
       console.log(`Found existing recipe: ${existingRecipe.id} - ${existingRecipe.name}`);
       
       // Ensure ingredients and instructions are arrays
-      let ingredients = safeParseJson(recipeData.ingredients);
-      let instructions = safeParseJson(recipeData.instructions);
+      const ingredients = safeParseJson(recipeData.ingredients);
+      const instructions = safeParseJson(recipeData.instructions);
       
       console.log('Data being sent to update recipe:', {
         id: recipeData.id,
@@ -449,8 +449,8 @@ export async function PUT(req: NextRequest) {
     console.log(`Found existing recipe: ${existingRecipe.id} - ${existingRecipe.name}`);
     
     // Ensure ingredients and instructions are arrays
-    let ingredients = safeParseJson(recipeData.ingredients);
-    let instructions = safeParseJson(recipeData.instructions);
+    const ingredients = safeParseJson(recipeData.ingredients);
+    const instructions = safeParseJson(recipeData.instructions);
     
     console.log('Data being sent to update recipe:', {
       id: recipeData.id,
