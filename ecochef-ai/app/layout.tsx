@@ -33,6 +33,7 @@ export default function RootLayout({
             </footer>
           </div>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );

@@ -195,13 +195,20 @@ export default function CookingAssistant() {
   // Fetch custom recipes from database API
   const fetchCustomRecipes = async () => {
     try {
-      // Fetch custom recipes from API
-      const response = await fetch('/api/custom-recipes');
+      console.log('Fetching custom recipes...');
+      // Fetch custom recipes from API with credentials
+      const response = await fetch('/api/custom-recipes', {
+        credentials: 'include' // Include cookies in the request
+      });
+      
       if (response.ok) {
         const data = await response.json();
+        console.log(`Fetched ${data.customRecipes?.length || 0} custom recipes`);
         setCustomRecipes(data.customRecipes || []);
       } else {
         console.error('Error response from custom recipes API:', response.status);
+        const errorData = await response.text();
+        console.error('Error details:', errorData);
       }
     } catch (error) {
       console.error('Error fetching custom recipes:', error);
@@ -211,7 +218,11 @@ export default function CookingAssistant() {
   // Fetch recipes from the weekly plan
   const fetchWeeklyPlanRecipes = async () => {
     try {
-      const response = await fetch('/api/weekly-plan');
+      console.log('Fetching weekly plan recipes...');
+      const response = await fetch('/api/weekly-plan', {
+        credentials: 'include' // Include cookies in the request
+      });
+      
       if (response.ok) {
         const data = await response.json();
         if (data.weeklyPlan) {
@@ -219,7 +230,7 @@ export default function CookingAssistant() {
           
           // Extract unique recipes from each day and meal time
           Object.keys(data.weeklyPlan).forEach(day => {
-            if (day !== 'weekStartDate') {
+            if (day !== 'weekStartDate' && day !== 'id' && day !== 'userid') {
               ['breakfast', 'lunch', 'dinner'].forEach(mealTime => {
                 if (Array.isArray(data.weeklyPlan[day][mealTime])) {
                   data.weeklyPlan[day][mealTime].forEach((recipe: Recipe) => {
@@ -233,8 +244,13 @@ export default function CookingAssistant() {
             }
           });
           
+          console.log(`Fetched ${planRecipes.length} unique recipes from weekly plan`);
           setWeeklyPlanRecipes(planRecipes);
         }
+      } else {
+        console.error('Error fetching weekly plan recipes:', response.status);
+        const errorData = await response.text();
+        console.error('Error details:', errorData);
       }
     } catch (error) {
       console.error('Error fetching weekly plan recipes:', error);

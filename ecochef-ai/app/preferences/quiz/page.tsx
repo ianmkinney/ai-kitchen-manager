@@ -193,27 +193,27 @@ export default function DietaryQuiz() {
       // Transform quiz answers into the format expected by the UserPreferences model
       const transformedPreferences = {
         // Dietary restrictions
-        isVegetarian: (answers.dietary as string[])?.includes('vegetarian') || false,
-        isVegan: (answers.dietary as string[])?.includes('vegan') || false,
-        isGlutenFree: (answers.dietary as string[])?.includes('gluten-free') || false,
-        isDairyFree: (answers.dietary as string[])?.includes('dairy-free') || false,
-        isNutFree: (answers.dietary as string[])?.includes('nut-free') || false,
+        "isVegetarian": (answers.dietary as string[])?.includes('vegetarian') || false,
+        "isVegan": (answers.dietary as string[])?.includes('vegan') || false,
+        "isGlutenFree": (answers.dietary as string[])?.includes('gluten-free') || false,
+        "isDairyFree": (answers.dietary as string[])?.includes('dairy-free') || false,
+        "isNutFree": (answers.dietary as string[])?.includes('nut-free') || false,
         
         // Cooking preferences
-        maxCookingTime: parseInt(answers['cooking-time'] as string || '60'),
-        cookingSkillLevel: answers['cooking-skill'] as string || 'intermediate',
-        peopleCount: parseInt(answers['meal-size'] as string || '1'),
+        "maxCookingTime": parseInt(answers['cooking-time'] as string || '60'),
+        "cookingSkillLevel": answers['cooking-skill'] as string || 'intermediate',
+        "peopleCount": parseInt(answers['meal-size'] as string || '1'),
         
         // Other preferences
-        cuisinePreferences: answers['cuisine-preference'] || [],
-        flavorPreferences: answers['flavor-preference'] || [],
-        healthGoals: answers['health-goals'] || [],
-        allergies: answers['allergies'] || [],
-        sustainabilityPreference: answers['sustainability'] as string || 'medium',
-        nutritionFocus: answers['nutrition-focus'] || [],
+        "cuisinePreferences": answers['cuisine-preference'] || [],
+        "flavorPreferences": answers['flavor-preference'] || [],
+        "healthGoals": answers['health-goals'] || [],
+        "allergies": answers['allergies'] || [],
+        "sustainabilityPreference": answers['sustainability'] as string || 'medium',
+        "nutritionFocus": answers['nutrition-focus'] || [],
         
         // Store the raw quiz answers too for reference
-        rawQuizAnswers: answers,
+        "rawQuizAnswers": answers,
       };
       
       // Send to API endpoint

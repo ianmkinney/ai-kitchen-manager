@@ -57,7 +57,11 @@ export async function GET(request: Request) {
     // Check if this is a test user and use admin client if needed
     let weeklyPlan, recipes;
     
-    if (user.id === '00000000-0000-0000-0000-000000000000') {
+    // Only use test user case if the user is actually the test user
+    // This ensures test user data isn't shown to regular users
+    // Strict check requires BOTH matching ID and email
+    if (user.id === '00000000-0000-0000-0000-000000000000' && 
+        user.email === 'test@ecochef.demo') {
       console.log('Using admin client for test user weekly plan');
       const { data: weeklyPlans, error: weeklyPlansError } = await getTestUserDataWithAdmin('weekly_plans');
       
@@ -87,6 +91,7 @@ export async function GET(request: Request) {
         }
       }
     } else {
+      console.log('Using server client for regular user weekly plan');
       // For regular users, create server client with our helper
       const supabase = await createServerClient();
       const { data: userWeeklyPlan, error } = await supabase
@@ -252,8 +257,10 @@ export async function POST(request: Request) {
 
     console.log(`Processing weekly plan with weekStartDate ${weekStartDate} and ${recipes.length} recipes`);
 
-    // Special handling for test user
-    if (user.id === '00000000-0000-0000-0000-000000000000') {
+    // Special handling for test user - only process as test user if the ID and email match the test user
+    // Strict check requires BOTH matching ID and email
+    if (user.id === '00000000-0000-0000-0000-000000000000' && 
+        user.email === 'test@ecochef.demo') {
       try {
         const adminClient = createAdminClient();
         
@@ -288,19 +295,19 @@ export async function POST(request: Request) {
           );
         }
         
-        // If we have recipes, delete existing recipes and add new ones
-        if (recipes.length > 0 && weeklyPlanData.id) {
-          // Delete existing recipes
-          const { error: deleteError } = await adminClient
+        // Process recipes for the test user weekly plan
+        if (weeklyPlanData?.id && recipes.length > 0) {
+          // Delete any existing recipes
+          const { error: deleteRecipesError } = await adminClient
             .from('weekly_plan_recipes')
             .delete()
             .eq('"weeklyPlanId"', weeklyPlanData.id);
             
-          if (deleteError) {
-            console.error('Error deleting test user weekly plan recipes:', deleteError);
+          if (deleteRecipesError) {
+            console.error('Error deleting existing test user weekly plan recipes:', deleteRecipesError);
           }
           
-          // Add new recipes
+          // Insert new recipes
           const recipesToInsert = recipes.map((recipe: RecipeInput) => ({
             "weeklyPlanId": weeklyPlanData.id,
             "recipeData": recipe.recipeData || {},
@@ -310,33 +317,34 @@ export async function POST(request: Request) {
             "updatedAt": new Date().toISOString()
           }));
           
-          const { error: insertError } = await adminClient
+          const { error: insertRecipesError } = await adminClient
             .from('weekly_plan_recipes')
             .insert(recipesToInsert);
             
-          if (insertError) {
-            console.error('Error inserting test user weekly plan recipes:', insertError);
-            return NextResponse.json(
-              { error: 'Failed to save weekly plan recipes', details: insertError },
-              { status: 500 }
-            );
+          if (insertRecipesError) {
+            console.error('Error inserting test user weekly plan recipes:', insertRecipesError);
           }
         }
         
-        return NextResponse.json({ 
-          message: 'Weekly plan saved successfully for test user',
-          weeklyPlan: weeklyPlanData
+        return NextResponse.json({
+          success: true,
+          weeklyPlan: {
+            id: weeklyPlanData.id,
+            userid: weeklyPlanData.userid,
+            "weekStartDate": weeklyPlanData["weekStartDate"],
+          },
         });
-      } catch (adminError) {
-        console.error('Error using admin client for test user:', adminError);
+      } catch (error) {
+        console.error('Error saving test user weekly plan:', error);
         return NextResponse.json(
-          { error: 'Failed to save test user weekly plan', details: adminError },
+          { error: 'Failed to save test user weekly plan' },
           { status: 500 }
         );
       }
     }
     
-    // Regular user flow with Supabase client
+    // Regular authenticated user case
+    console.log('Saving weekly plan for regular user:', user.id);
     const supabase = await createServerClient();
     
     // Delete any existing weekly plans for this user first to maintain just one plan

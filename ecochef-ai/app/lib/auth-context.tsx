@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from './supabase';
 import { createClient } from '@supabase/supabase-js';
+import { hashPassword, verifyPassword } from './auth-utils';
 
 export interface User {
   id: string;
@@ -33,68 +34,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  useEffect(() => {
-    // Check for existing auth session with custom cookies
-    const checkAuth = async () => {
-      try {
-        // Check if we have cookies indicating a logged in user
-        const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-        const testUserCookie = cookies.find(c => c.startsWith('ecochef_test_user='));
-        const userIdCookie = cookies.find(c => c.startsWith('ecochef_test_user_id='));
-        const userEmailCookie = cookies.find(c => c.startsWith('ecochef_test_user_email='));
+  const checkAuth = useCallback(async () => {
+    try {
+      console.log('Checking for existing authentication session');
+      let userAuthenticated = false;
+      
+      // Check if we have cookies indicating a logged in user
+      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+      const testUserCookie = cookies.find(c => c.startsWith('ecochef_test_user='));
+      const userIdCookie = cookies.find(c => c.startsWith('ecochef_test_user_id='));
+      const userEmailCookie = cookies.find(c => c.startsWith('ecochef_test_user_email='));
+      
+      // Check for test user first
+      if (testUserCookie && userIdCookie && userEmailCookie) {
+        const userId = userIdCookie.split('=')[1];
+        const userEmail = userEmailCookie.split('=')[1];
         
-        // Check for test user first
-        if (testUserCookie && userIdCookie && userEmailCookie) {
-          const userId = userIdCookie.split('=')[1];
-          const userEmail = userEmailCookie.split('=')[1];
+        const userData: User = {
+          id: userId,
+          username: 'testuser',
+          email: userEmail,
+          isLoggedIn: true
+        };
+        
+        console.log('Found test user session:', userData);
+        setUser(userData);
+        setLoading(false);
+        return; // Exit early since we found a valid user
+      }
+      
+      // Check for normal user auth cookie
+      const normalUserCookie = cookies.find(c => c.startsWith('ecochef_user_id='));
+      
+      if (normalUserCookie) {
+        const userId = normalUserCookie.split('=')[1];
+        console.log('Found user cookie with ID:', userId);
+        const supabase = createDirectClient();
+        
+        // Get user details from custom User table
+        const { data, error } = await supabase
+          .from('User')
+          .select('id, email, name')
+          .eq('id', userId)
+          .single();
           
+        if (data && !error) {
           const userData: User = {
-            id: userId,
-            username: 'testuser',
-            email: userEmail,
+            id: data.id,
+            username: data.name || 'User',
+            email: data.email,
             isLoggedIn: true
           };
           
+          console.log('Found valid user in database:', userData);
           setUser(userData);
-          setLoading(false);
-          return;
+          userAuthenticated = true; // Mark that we've found a valid user
+        } else {
+          // Cookie exists but user not found - clear cookies
+          console.log('User ID from cookie not found in database, clearing cookies');
+          document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax';
+          document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax';
         }
-        
-        // Check for normal user auth cookie
-        const userCookie = cookies.find(c => c.startsWith('ecochef_user_id='));
-        
-        if (userCookie) {
-          const userId = userCookie.split('=')[1];
-          const supabase = createDirectClient();
-          
-          // Get user details from custom User table
-          const { data, error } = await supabase
-            .from('User')
-            .select('id, email, name')
-            .eq('id', userId)
-            .single();
-            
-          if (data && !error) {
-            const userData: User = {
-              id: data.id,
-              username: data.name || 'User',
-              email: data.email,
-              isLoggedIn: true
-            };
-            
-            setUser(userData);
-          } else {
-            // Cookie exists but user not found - clear cookies
-            document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax';
-            document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax';
-          }
-        }
-        
-        // Also check Supabase auth as fallback
+      } else {
+        console.log('No user cookie found');
+      }
+      
+      // Only check Supabase auth if we haven't already authenticated a user
+      if (!userAuthenticated) {
+        console.log('Checking Supabase Auth session');
         const supabase = createBrowserClient();
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
+          console.log('Found Supabase Auth session');
           const { data: { user: supabaseUser } } = await supabase.auth.getUser();
           
           if (supabaseUser) {
@@ -105,23 +117,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               isLoggedIn: true
             };
             
+            console.log('Using Supabase Auth user:', userData);
             setUser(userData);
+            
+            // Set our custom cookies to remember this user
+            document.cookie = `ecochef_user_id=${userData.id}; path=/; max-age=86400; SameSite=Lax`;
+            document.cookie = `ecochef_user_email=${userData.email}; path=/; max-age=86400; SameSite=Lax`;
           }
+        } else {
+          console.log('No Supabase Auth session found');
         }
-      } catch (error) {
-        console.error('Error checking authentication:', error);
-      } finally {
-        setLoading(false);
+      } else {
+        console.log('User already authenticated via custom table, skipping Supabase Auth check');
       }
-    };
-    
-    checkAuth();
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('Login attempt for:', email);
+      
+      // Clear any existing cookies to ensure a clean state
+      document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_test_user=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_test_user_id=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_test_user_email=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'test_user=; path=/; max-age=0; SameSite=Lax';
+      
       // Special handling for test account
       if (email === 'test@ecochef.demo' && password === 'password123') {
+        console.log('Using special test user login flow');
         // Create a user object for the test account
         const testUser: User = {
           id: '00000000-0000-0000-0000-000000000000',
@@ -142,7 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
       
-      // Try to authenticate with custom User table
+      // First check our custom User table directly - this is our primary authentication method
+      console.log('Checking user in custom User table');
       const supabase = createDirectClient();
       
       // Check if the user exists in the User table
@@ -152,49 +187,143 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('email', email.toLowerCase())
         .single();
       
-      if (error || !data) {
-        console.error('User not found:', error);
-        // Try Supabase auth as fallback
-        const authClient = createBrowserClient();
+      if (data && !error) {
+        console.log('User found in custom table, verifying password');
+        
+        try {
+          // Debug output for password verification
+          const storedHash = data.password;
+          const generatedHash = hashPassword(password);
+          const passwordMatches = verifyPassword(password, storedHash);
+          
+          console.log('Password verification debug:');
+          console.log('- Stored hash:', storedHash);
+          console.log('- Generated hash:', generatedHash);
+          console.log('- Password match:', passwordMatches);
+          
+          if (passwordMatches) {
+            console.log('Password verification succeeded');
+            
+            // Authentication successful with custom table
+            const userData: User = {
+              id: data.id,
+              username: data.name || 'User',
+              email: data.email,
+              isLoggedIn: true
+            };
+            
+            // Set custom auth cookies
+            document.cookie = `ecochef_user_id=${userData.id}; path=/; max-age=86400; SameSite=Lax`;
+            document.cookie = `ecochef_user_email=${userData.email}; path=/; max-age=86400; SameSite=Lax`;
+            
+            // Ensure browser gets the updated cookies
+            console.log('Setting user state and completing login');
+            
+            // Force a slight delay to ensure cookies are properly set before proceeding
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            setUser(userData);
+            console.log('Login successful, user state set:', userData);
+            return true;
+          } else {
+            console.log('Password verification failed');
+            throw new Error('Invalid password');
+          }
+        } catch (verifyError) {
+          console.error('Error during password verification:', verifyError);
+          throw new Error('Invalid password');
+        }
+      }
+      
+      // If we reach here, we didn't find the user in our custom table or password verification failed
+      // Try authenticating with Supabase Auth as fallback
+      console.log('User not found in custom table or password verification failed, trying Supabase Auth');
+      const authClient = createBrowserClient();
+      
+      try {
         const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
           email,
           password
         });
         
         if (authError || !authData.user) {
+          console.error('Supabase Auth login failed:', authError?.message);
           throw new Error(authError?.message || 'Login failed. Please check your credentials.');
+        }
+        
+        console.log('Supabase Auth login successful, setting up user in custom table');
+        
+        // If we get here, the user was authenticated by Supabase Auth but not in our custom User table
+        // Add them to our custom User table
+        const hashedPassword = hashPassword(password);
+        const username = authData.user.user_metadata?.username || email.split('@')[0];
+        
+        const { error: insertError } = await supabase
+          .from('User')
+          .insert([{
+            id: authData.user.id,
+            email: email.toLowerCase(),
+            password: hashedPassword,
+            name: username,
+            "createdAt": new Date().toISOString(),
+            "updatedAt": new Date().toISOString()
+          }]);
+          
+        if (insertError) {
+          console.error('Error adding authenticated user to custom table:', insertError);
+        } else {
+          console.log('Successfully added user to custom table');
+        }
+        
+        // Create default user preferences
+        const { error: prefsError } = await supabase
+          .from('user_preferences')
+          .insert([
+            {
+              userid: authData.user.id,
+              "isVegetarian": false,
+              "isVegan": false,
+              "isGlutenFree": false,
+              "isDairyFree": false,
+              "isNutFree": false,
+              "maxCookingTime": 30,
+              "cookingSkillLevel": 'intermediate',
+              "peopleCount": 1,
+              "cuisinePreferences": [],
+              "healthGoals": [],
+              allergies: [],
+              "spicyPreference": 5,
+              "sweetPreference": 5,
+              "savoryPreference": 5,
+              "createdAt": new Date().toISOString(),
+              "updatedAt": new Date().toISOString()
+            }
+          ]);
+          
+        if (prefsError) {
+          console.error('Error creating user preferences for new user:', prefsError);
         }
         
         const userData: User = {
           id: authData.user.id,
-          username: authData.user.user_metadata?.username || 'User',
-          email: authData.user.email!,
+          username: username,
+          email: authData.user.email || '',
           isLoggedIn: true
         };
         
+        // Set custom auth cookies
+        document.cookie = `ecochef_user_id=${userData.id}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `ecochef_user_email=${userData.email}; path=/; max-age=86400; SameSite=Lax`;
+        
         setUser(userData);
         return true;
+      } catch (authError) {
+        console.error('All authentication methods failed');
+        if (authError instanceof Error) {
+          throw authError;
+        }
+        throw new Error('Login failed. Please check your credentials.');
       }
-      
-      // Check password (in a real app, this would be hashed)
-      if (data.password !== password) {
-        throw new Error('Invalid password');
-      }
-      
-      // Authentication successful
-      const userData: User = {
-        id: data.id,
-        username: data.name || 'User',
-        email: data.email,
-        isLoggedIn: true
-      };
-      
-      // Set custom auth cookies
-      document.cookie = `ecochef_user_id=${userData.id}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `ecochef_user_email=${userData.email}; path=/; max-age=86400; SameSite=Lax`;
-      
-      setUser(userData);
-      return true;
     } catch (error) {
       if (error instanceof Error) {
         console.error('Login error:', error.message);
@@ -207,164 +336,223 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const signup = async (email: string, password: string, username: string): Promise<boolean> => {
     try {
-      // Create user in custom User table
+      console.log('Starting user signup process for:', email);
+      
+      // First create the user in Supabase Auth
+      const authClient = createBrowserClient();
+      
+      console.log('Creating user with Supabase Auth');
+      const { data: authData, error: authError } = await authClient.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username
+          }
+        }
+      });
+
+      if (authError) {
+        console.error('Error creating user with Supabase Auth:', authError);
+        throw new Error(authError.message || 'Signup failed. Please try again.');
+      }
+
+      if (!authData.user) {
+        console.error('No user returned from Supabase Auth signup');
+        throw new Error('Failed to create user account');
+      }
+      
+      console.log('Successfully created user in Supabase Auth');
+      console.log('User ID:', authData.user.id);
+      
+      // Hash the password for storage
+      const hashedPassword = hashPassword(password);
+      console.log('Generated password hash for new user:', hashedPassword);
+      
+      // Create the user in our custom User table with the same ID
       const supabase = createDirectClient();
       
-      // Check if user already exists
-      const { data: existingUser } = await supabase
+      // Check if user already exists in our custom table
+      console.log('Checking if user exists in custom User table');
+      const { data: existingUser, error: existingUserError } = await supabase
         .from('User')
         .select('id')
         .eq('email', email.toLowerCase())
-        .single();
+        .maybeSingle();
+      
+      if (existingUserError) {
+        console.error('Error checking existing user:', existingUserError);
+      }
       
       if (existingUser) {
-        throw new Error('User with this email already exists');
+        console.log('User already exists in custom User table, updating information');
+        // Update the existing user
+        const { error: updateError } = await supabase
+          .from('User')
+          .update({
+            id: authData.user.id, // Update to match Auth ID
+            email: email.toLowerCase(),
+            password: hashedPassword, // Update with new password hash
+            name: username,
+            "updatedAt": new Date().toISOString()
+          })
+          .eq('id', existingUser.id);
+          
+        if (updateError) {
+          console.error('Error updating existing user in custom User table:', updateError);
+        } else {
+          console.log('Successfully updated existing user');
+        }
+      } else {
+        console.log('Creating user in custom User table with ID:', authData.user.id);
+        
+        // Verify we can properly hash and verify the password before saving
+        const testVerify = verifyPassword(password, hashedPassword);
+        console.log('Password hash verification test:', testVerify);
+        
+        const { data, error } = await supabase
+          .from('User')
+          .insert([{
+            id: authData.user.id, // Use the ID from Auth
+            email: email.toLowerCase(),
+            password: hashedPassword, // Store hashed password
+            name: username,
+            "createdAt": new Date().toISOString(),
+            "updatedAt": new Date().toISOString()
+          }])
+          .select();
+        
+        if (error) {
+          console.error('Error creating user in custom User table:', error);
+          console.error('Error message:', error.message);
+          console.error('Error details:', error.details);
+          // Continue anyway since the auth user was created
+        } else {
+          console.log('Successfully created user in custom User table:', data);
+        }
+      }
+
+      // Create default user preferences
+      console.log('Creating user preferences for:', authData.user.id);
+      
+      // First check if preferences already exist
+      const { data: existingPrefs, error: existingPrefsError } = await supabase
+        .from('user_preferences')
+        .select('id')
+        .eq('userid', authData.user.id)
+        .maybeSingle();
+        
+      if (existingPrefsError) {
+        console.error('Error checking existing preferences:', existingPrefsError);
       }
       
-      // Create new user in the User table
-      const { data, error } = await supabase
-        .from('User')
-        .insert([{
-          email: email.toLowerCase(),
-          password: password, // In production, this would be hashed
-          name: username
-        }])
-        .select()
-        .single();
-      
-      if (error || !data) {
-        // Try Supabase auth as fallback
-        const authClient = createBrowserClient();
-        const { data: authData, error: authError } = await authClient.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              username
-            }
-          }
-        });
-
-        if (authError) {
-          throw new Error(authError.message || 'Signup failed. Please try again.');
-        }
-
-        if (authData.user) {
-          // Create default user preferences with consistent lowercase column naming
-          const { error: prefsError } = await authClient.from('user_preferences').insert([
+      if (existingPrefs) {
+        console.log('User preferences already exist, skipping creation');
+      } else {
+        const { error: prefsError } = await supabase
+          .from('user_preferences')
+          .insert([
             {
               userid: authData.user.id,
-              isvegetarian: false,
-              isvegan: false,
-              isglutenfree: false,
-              isdairyfree: false,
-              isnutfree: false,
-              maxcookingtime: 30,
-              cookingskilllevel: 'intermediate',
-              peoplecount: 1,
-              preferredcuisines: [],
-              dietgoals: [],
+              "isVegetarian": false,
+              "isVegan": false,
+              "isGlutenFree": false,
+              "isDairyFree": false,
+              "isNutFree": false,
+              "maxCookingTime": 30,
+              "cookingSkillLevel": 'intermediate',
+              "peopleCount": 1,
+              "cuisinePreferences": [],
+              "healthGoals": [],
               allergies: [],
-              spicypreference: 5,
-              sweetpreference: 5,
-              savorypreference: 5,
-              createdat: new Date().toISOString(),
-              updatedat: new Date().toISOString()
+              "spicyPreference": 5,
+              "sweetPreference": 5,
+              "savoryPreference": 5,
+              "createdAt": new Date().toISOString(),
+              "updatedAt": new Date().toISOString()
             }
           ]);
-          
-          if (prefsError) {
-            console.error('Error creating user preferences:', prefsError);
-          }
-          
-          return true;
-        }
         
-        return false;
-      }
-      
-      // Create user preferences for the new custom user
-      const { error: prefsError } = await supabase.from('user_preferences').insert([
-        {
-          userid: data.id,
-          isvegetarian: false,
-          isvegan: false,
-          isglutenfree: false,
-          isdairyfree: false,
-          isnutfree: false,
-          maxcookingtime: 30,
-          cookingskilllevel: 'intermediate',
-          peoplecount: 1,
-          preferredcuisines: [],
-          dietgoals: [],
-          allergies: [],
-          spicypreference: 5,
-          sweetpreference: 5,
-          savorypreference: 5,
-          createdat: new Date().toISOString(),
-          updatedat: new Date().toISOString()
+        if (prefsError) {
+          console.error('Error creating user preferences:', prefsError);
+          console.error('Preferences error message:', prefsError.message);
+          console.error('Preferences error details:', prefsError.details);
+        } else {
+          console.log('Successfully created user preferences');
         }
-      ]);
-      
-      if (prefsError) {
-        console.error('Error creating user preferences:', prefsError);
       }
       
-      // Add initial pantry item
-      const { error: pantryError } = await supabase.from('pantry_items').insert([
-        {
-          name: 'Welcome to your pantry!',
-          userId: data.id,
-          category: 'other',
-          quantity: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]);
+      // Ensure we're not setting any test user cookies
+      document.cookie = 'test_user=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_test_user=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_test_user_id=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'ecochef_test_user_email=; path=/; max-age=0; SameSite=Lax';
       
-      if (pantryError) {
-        console.error('Error creating initial pantry item:', pantryError);
-      }
+      // Set regular user cookies
+      console.log('Setting user cookies for:', authData.user.id);
+      document.cookie = `ecochef_user_id=${authData.user.id}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `ecochef_user_email=${authData.user.email}; path=/; max-age=86400; SameSite=Lax`;
       
-      // Set custom auth cookies
-      document.cookie = `ecochef_user_id=${data.id}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `ecochef_user_email=${data.email}; path=/; max-age=86400; SameSite=Lax`;
-      
-      // Update user state
-      const userData: User = {
-        id: data.id,
+      setUser({
+        id: authData.user.id,
         username: username,
-        email: data.email,
+        email: authData.user.email!,
         isLoggedIn: true
-      };
+      });
       
-      setUser(userData);
+      console.log('Signup process completed successfully');
       return true;
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error('Signup error:', error.message);
-        throw error;
-      }
-      console.error('Signup error:', error);
-      throw new Error('Signup failed. Please try again later.');
+    } catch (err: unknown) {
+      console.error('Signup error:', err);
+      throw err;
     }
   };
 
   const logout = async (): Promise<void> => {
     try {
-      // Clear custom auth cookies
+      console.log('Starting logout process...');
+      
+      // Clear custom auth cookies with multiple variations to ensure deletion
+      // Without domain specification
       document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax';
       document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax';
       document.cookie = 'ecochef_test_user=; path=/; max-age=0; SameSite=Lax';
       document.cookie = 'ecochef_test_user_id=; path=/; max-age=0; SameSite=Lax';
       document.cookie = 'ecochef_test_user_email=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = 'test_user=; path=/; max-age=0; SameSite=Lax';
+      
+      // With empty domain
+      document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_test_user=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_test_user_id=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_test_user_email=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'test_user=; path=/; max-age=0; SameSite=Lax; domain=';
+      
+      // With expires attribute
+      const pastDate = new Date(0).toUTCString();
+      document.cookie = `ecochef_user_id=; path=/; expires=${pastDate}; SameSite=Lax`;
+      document.cookie = `ecochef_user_email=; path=/; expires=${pastDate}; SameSite=Lax`;
+      document.cookie = `ecochef_test_user=; path=/; expires=${pastDate}; SameSite=Lax`;
+      document.cookie = `ecochef_test_user_id=; path=/; expires=${pastDate}; SameSite=Lax`;
+      document.cookie = `ecochef_test_user_email=; path=/; expires=${pastDate}; SameSite=Lax`;
+      document.cookie = `test_user=; path=/; expires=${pastDate}; SameSite=Lax`;
+      
+      // Check if cookies are properly cleared
+      console.log('Cookies after clearing:', document.cookie);
       
       // Also sign out from Supabase (as fallback)
       const supabase = createBrowserClient();
       await supabase.auth.signOut();
+      console.log('Supabase signOut completed');
       
       // Update state
       setUser(null);
+      console.log('User state reset to null');
+      
+      // Force a slight delay to ensure all operations complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+      console.log('Logout process completed');
     } catch (error) {
       console.error('Logout error:', error);
       throw new Error('Logout failed. Please try again.');

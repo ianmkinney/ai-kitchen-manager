@@ -57,9 +57,82 @@ export async function saveUserPreferences(preferences: Record<string, unknown>) 
       throw new Error('User must be authenticated to save preferences');
     }
     
+    // Normalize the preferences to match the database schema
+    const normalizedPrefs: Record<string, unknown> = {};
+    
+    // Convert camelCase or lowercase keys to PascalCase where needed
+    for (const [key, value] of Object.entries(preferences)) {
+      switch (key.toLowerCase()) {
+        case 'isvegetarian':
+          normalizedPrefs["isVegetarian"] = value;
+          break;
+        case 'isvegan':
+          normalizedPrefs["isVegan"] = value;
+          break;
+        case 'isglutenfree':
+          normalizedPrefs["isGlutenFree"] = value;
+          break;
+        case 'isdairyfree':
+          normalizedPrefs["isDairyFree"] = value;
+          break;
+        case 'isnutfree':
+          normalizedPrefs["isNutFree"] = value;
+          break;
+        case 'spicypreference':
+          normalizedPrefs["spicyPreference"] = value;
+          break;
+        case 'sweetpreference':
+          normalizedPrefs["sweetPreference"] = value;
+          break;
+        case 'savorypreference':
+          normalizedPrefs["savoryPreference"] = value;
+          break;
+        case 'maxcookingtime':
+          normalizedPrefs["maxCookingTime"] = value;
+          break;
+        case 'cookingskilllevel':
+          normalizedPrefs["cookingSkillLevel"] = value;
+          break;
+        case 'peoplecount':
+          normalizedPrefs["peopleCount"] = value;
+          break;
+        case 'healthgoals':
+          normalizedPrefs["healthGoals"] = value;
+          break;
+        case 'dietgoals':
+          normalizedPrefs["healthGoals"] = value;
+          break;
+        case 'preferredcuisines':
+        case 'cuisinepreferences':
+          normalizedPrefs["cuisinePreferences"] = value;
+          break;
+        case 'flavorpreferences':
+          normalizedPrefs["flavorPreferences"] = value;
+          break;
+        case 'allergies':
+          normalizedPrefs["allergies"] = value; // lowercase as in schema
+          break;
+        case 'sustainabilitypreference':
+          normalizedPrefs["sustainabilityPreference"] = value;
+          break;
+        case 'nutritionfocus':
+          normalizedPrefs["nutritionFocus"] = value;
+          break;
+        case 'createdat':
+          normalizedPrefs["createdAt"] = value;
+          break;
+        case 'updatedat':
+          normalizedPrefs["updatedAt"] = value;
+          break;
+        default:
+          // If already properly cased or unknown field, keep as is
+          normalizedPrefs[key] = value;
+      }
+    }
+    
     // Add userid to preferences - use lowercase to match database schema
     const prefsWithUserId = {
-      ...preferences,
+      ...normalizedPrefs,
       userid: user.id, // Changed from userId to userid to match database schema
       updatedAt: new Date().toISOString()
     };

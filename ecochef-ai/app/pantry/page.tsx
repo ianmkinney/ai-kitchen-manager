@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+// Remove direct Supabase import as we'll use the API routes
+// import { supabase } from '../lib/supabase';
 
 // Define pantry item interface
 interface PantryItem {
@@ -44,38 +45,26 @@ export default function Pantry() {
     fetchPantryItems();
   }, []);
 
-  // Fetch pantry items from Supabase
+  // Fetch pantry items from API route instead of directly from Supabase
   const fetchPantryItems = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
-        .from('pantry_items')
-        .select('*')
-        .order('"createdAt"', { ascending: false });
+      // Use API route instead of direct Supabase call
+      const response = await fetch('/api/pantry', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      // Handle common database errors
-      if (error) {
-        console.error('Database error:', error);
-        
-        // Table doesn't exist yet
-        if (error.code === '42P01') {
-          setError('Database tables not initialized yet. Please run the Supabase setup script.');
-          setPantryItems([]);
-          return;
-        }
-        
-        // Column doesn't exist (common with camelCase issues)
-        if (error.message && error.message.includes('column') && error.message.includes('does not exist')) {
-          setError('Database schema mismatch. Please re-initialize the database with the correct column names.');
-          setPantryItems([]);
-          return;
-        }
-        
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch pantry items');
       }
 
-      setPantryItems(data?.map(item => item) || []);
+      const data = await response.json();
+      setPantryItems(data.pantryItems || []);
     } catch (error) {
       console.error('Error fetching pantry items:', error);
       setError('There was an error loading your pantry items. Please check the console for details.');

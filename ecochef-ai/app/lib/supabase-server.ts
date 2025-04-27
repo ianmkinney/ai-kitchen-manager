@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { verifyPassword, hashPassword } from './auth-utils';
 
 // Define interface for test user data
 interface TestUser {
@@ -100,12 +101,33 @@ export async function createServerClient(): Promise<ExtendedSupabaseClient> {
  */
 export async function getCurrentUser(request?: Request) {
   try {
-    // Check for test user cookie
+    // Check for normal user cookie first - prioritize over test user
     try {
       const cookieStore = await cookies();
-      // Check if the test_user cookie exists
-      if (cookieStore.has('test_user')) {
-        console.log('Using test user session');
+      
+      // First check for regular user cookie
+      const userIdCookie = cookieStore.get('ecochef_user_id');
+      const userEmailCookie = cookieStore.get('ecochef_user_email');
+      
+      if (userIdCookie && userEmailCookie) {
+        console.log('Using normal user session from cookies');
+        return {
+          id: userIdCookie.value,
+          email: userEmailCookie.value,
+          role: 'authenticated',
+        };
+      }
+      
+      // Only check for test user if no regular user found
+      // More strict check: both test_user cookie AND matching ID and email are required
+      const hasTestUserCookie = cookieStore.has('test_user') || cookieStore.has('ecochef_test_user');
+      const testUserIdCookie = cookieStore.get('ecochef_test_user_id');
+      const testUserEmailCookie = cookieStore.get('ecochef_test_user_email');
+      
+      if (hasTestUserCookie && 
+          testUserIdCookie?.value === '00000000-0000-0000-0000-000000000000' && 
+          testUserEmailCookie?.value === 'test@ecochef.demo') {
+        console.log('Using test user session from cookies with verified ID and email');
         return {
           id: '00000000-0000-0000-0000-000000000000',
           email: 'test@ecochef.demo',
@@ -113,19 +135,53 @@ export async function getCurrentUser(request?: Request) {
         };
       }
     } catch (cookieError) {
-      console.error('Error checking test user cookie:', cookieError);
+      console.error('Error checking user cookies:', cookieError);
     }
 
-    // Check for session data in headers if request is provided
+    // Check request headers and cookies if request is provided
     if (request) {
+      // First check for regular user in headers (set by middleware)
       const userId = request.headers.get('x-user-id');
       const userEmail = request.headers.get('x-user-email');
 
       if (userId && userEmail) {
+        console.log('Using user from request headers');
         return {
           id: userId,
           email: userEmail,
           role: 'authenticated', 
+        };
+      }
+      
+      // Check request cookies if headers didn't have user info
+      const cookieHeader = request.headers.get('cookie') || '';
+      
+      // First look for regular user cookies
+      const userIdMatch = cookieHeader.match(/ecochef_user_id=([^;]+)/);
+      const userEmailMatch = cookieHeader.match(/ecochef_user_email=([^;]+)/);
+      
+      if (userIdMatch && userEmailMatch) {
+        console.log('Using regular user from request cookies');
+        return {
+          id: userIdMatch[1],
+          email: decodeURIComponent(userEmailMatch[1]),
+          role: 'authenticated',
+        };
+      }
+      
+      // If no regular user found, check for test user with strict validation
+      const hasTestUserCookie = cookieHeader.includes('test_user=') || cookieHeader.includes('ecochef_test_user=');
+      const testUserIdMatch = cookieHeader.match(/ecochef_test_user_id=([^;]+)/);
+      const testUserEmailMatch = cookieHeader.match(/ecochef_test_user_email=([^;]+)/);
+      
+      if (hasTestUserCookie && 
+          testUserIdMatch && testUserIdMatch[1] === '00000000-0000-0000-0000-000000000000' && 
+          testUserEmailMatch && decodeURIComponent(testUserEmailMatch[1]) === 'test@ecochef.demo') {
+        console.log('Using test user from request cookies with verified ID and email');
+        return {
+          id: '00000000-0000-0000-0000-000000000000',
+          email: 'test@ecochef.demo',
+          role: 'authenticated',
         };
       }
     }
@@ -138,6 +194,7 @@ export async function getCurrentUser(request?: Request) {
       return null;
     }
 
+    console.log('Using user from Supabase Auth');
     return {
       id: user.id,
       email: user.email,
@@ -168,9 +225,8 @@ export async function authenticateCustomUser(email: string, password: string) {
       return { user: null, error: error || new Error('User not found') };
     }
 
-    // For a real application, you would hash passwords, but for simplicity we're using direct comparison
-    // TODO: Implement password hashing for production use
-    if (data.password !== password) {
+    // Verify the password hash 
+    if (!verifyPassword(password, data.password)) {
       return { user: null, error: new Error('Invalid credentials') };
     }
 
@@ -199,14 +255,18 @@ export async function createCustomUser(email: string, password: string, name: st
       return { user: null, error: new Error('User with this email already exists') };
     }
 
-    // Create a new user
-    // TODO: Hash password for production use
+    // Hash the password for storage
+    const hashedPassword = hashPassword(password);
+    
+    // Create a new user with hashed password
     const { data, error } = await supabase
       .from('User')
       .insert([{ 
         email: email.toLowerCase(), 
-        password: password, // In production, this would be hashed
-        name: name 
+        password: hashedPassword,
+        name: name,
+        "createdAt": new Date().toISOString(),
+        "updatedAt": new Date().toISOString()
       }])
       .select()
       .single();

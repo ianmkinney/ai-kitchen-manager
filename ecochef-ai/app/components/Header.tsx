@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '../lib/supabase';
+import { useAuth } from '../lib/auth-context';
+import { useRouter } from 'next/navigation';
 
 // Replace the direct supabase instance with a browser client
 const supabase = createBrowserClient();
@@ -10,6 +12,8 @@ const supabase = createBrowserClient();
 export default function Header() {
   const [hasPreferences, setHasPreferences] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const { logout } = useAuth();
+  const router = useRouter();
 
   // Check if user has preferences on component mount
   useEffect(() => {
@@ -35,12 +39,22 @@ export default function Header() {
 
   // Handle logout
   const handleLogout = async () => {
+    console.log('Header: Logout button clicked');
     try {
-      await supabase.auth.signOut();
-      // Redirect to login page after logout
-      window.location.href = '/login';
+      // Use the auth context's logout function instead of direct Supabase call
+      await logout();
+      
+      // Explicitly clear cookies here as well to ensure logout
+      document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax; domain=';
+      
+      console.log('Header: Logout completed successfully');
+      
+      // Use Next router instead of direct window location change
+      router.push('/login');
+      router.refresh();
     } catch (error) {
-      console.error('Error logging out:', error);
+      console.error('Header: Error logging out:', error);
     }
   };
 

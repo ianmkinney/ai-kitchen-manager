@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { createServerClient, getCurrentUser } from '../../../lib/supabase-server';
 
 // DELETE endpoint to clear all pantry items
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
     // Get the current user
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

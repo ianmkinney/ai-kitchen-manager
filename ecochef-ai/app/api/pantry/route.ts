@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     }
 
     // Check if this is a test user and use admin client if needed
-    if (user.id === '00000000-0000-0000-0000-000000000000') {
+    if (user.id === '00000000-0000-0000-0000-000000000000' && user.email === 'test@ecochef.demo') {
       console.log('Using admin client for test user pantry items');
       const { data, error } = await getTestUserDataWithAdmin('pantry_items');
       
@@ -96,7 +96,8 @@ export async function POST(request: Request) {
     };
 
     // Check if this is a test user and use admin client if needed
-    if (user.id === '00000000-0000-0000-0000-000000000000') {
+    // Only use the admin client if BOTH the ID and email match the test user
+    if (user.id === '00000000-0000-0000-0000-000000000000' && user.email === 'test@ecochef.demo') {
       console.log('Using admin client for adding test user pantry item');
       const { data, error } = await insertTestUserDataWithAdmin('pantry_items', newItem);
       
@@ -153,7 +154,7 @@ export async function PUT(request: Request) {
     }
 
     // Get the current authenticated user
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
 
     // If no user is authenticated, return 401 Unauthorized
     if (!user) {
@@ -171,7 +172,7 @@ export async function PUT(request: Request) {
       .from('pantry_items')
       .select('*')
       .eq('id', id)
-      .eq('userid', user.id) // Changed from "userId" to userid
+      .eq('userid', user.id)
       .single();
 
     if (findError || !existingItem) {
@@ -185,11 +186,11 @@ export async function PUT(request: Request) {
     const { data: updatedItem, error } = await supabase
       .from('pantry_items')
       .update({
-        "itemName": name !== undefined ? name : existingItem.name,
+        "itemName": name !== undefined ? name : existingItem.itemName,
         category: category !== undefined ? category : existingItem.category,
         quantity: quantity !== undefined ? quantity : existingItem.quantity,
         unit: unit !== undefined ? unit : existingItem.unit,
-        "expirationDate": expiration ? new Date(expiration).toISOString() : existingItem.expiration,
+        "expirationDate": expiration ? new Date(expiration).toISOString() : existingItem.expirationDate,
         "updatedAt": new Date().toISOString()
       })
       .eq('id', id)
@@ -229,7 +230,7 @@ export async function DELETE(request: Request) {
     }
 
     // Get the current authenticated user
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
 
     // If no user is authenticated, return 401 Unauthorized
     if (!user) {
@@ -247,7 +248,7 @@ export async function DELETE(request: Request) {
       .from('pantry_items')
       .select('id')
       .eq('id', id)
-      .eq('userid', user.id) // Changed from userId to userid
+      .eq('userid', user.id)
       .single();
 
     if (fetchError || !item) {
@@ -262,7 +263,8 @@ export async function DELETE(request: Request) {
     const { error } = await supabase
       .from('pantry_items')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('userid', user.id); // Added user ID check for extra security
 
     if (error) {
       console.error('Error deleting pantry item:', error);

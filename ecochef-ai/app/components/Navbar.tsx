@@ -9,9 +9,26 @@ export default function Navbar() {
   const { user, loading, logout } = useAuth();
   
   const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-    router.refresh();
+    console.log('Logout button clicked');
+    try {
+      await logout();
+      console.log('Logout completed successfully');
+      
+      // Force clearing cookies in multiple ways to ensure deletion
+      document.cookie = 'ecochef_user_id=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_user_email=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_test_user=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_test_user_id=; path=/; max-age=0; SameSite=Lax; domain=';
+      document.cookie = 'ecochef_test_user_email=; path=/; max-age=0; SameSite=Lax; domain=';
+      
+      // Check cookies after deletion
+      console.log('Cookies after deletion:', document.cookie);
+      
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
   
   return (

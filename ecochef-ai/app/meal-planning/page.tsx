@@ -506,18 +506,51 @@ export default function MealPlanning() {
     
     try {
       // Format preferences to match what the API expects
+      // Create a preferences object with proper column casing
+      const formattedPreferences = {
+        "isVegetarian": preferences.isVegetarian,
+        "isVegan": preferences.isVegan,
+        "isGlutenFree": preferences.isGlutenFree,
+        "isDairyFree": preferences.isDairyFree,
+        "isNutFree": preferences.isNutFree,
+        "spicyPreference": preferences.spicyPreference,
+        "sweetPreference": preferences.sweetPreference,
+        "savoryPreference": preferences.savoryPreference,
+        "maxCookingTime": preferences.maxCookingTime,
+        "cookingSkillLevel": preferences.cookingSkillLevel,
+        "peopleCount": preferences.peopleCount,
+        cuisine: preferences.cuisine,
+        "cuisinePreferences": preferences.cuisinePreferences,
+        "flavorPreferences": preferences.flavorPreferences,
+        "healthGoals": preferences.healthGoals,
+        allergies: preferences.allergies,
+        "sustainabilityPreference": preferences.sustainabilityPreference,
+        "nutritionFocus": preferences.nutritionFocus,
+        "calorieTarget": preferences.calorieTarget,
+        "proteinTarget": preferences.proteinTarget,
+        "carbTarget": preferences.carbTarget,
+        "fatTarget": preferences.fatTarget,
+        "updatedAt": new Date().toISOString()
+      };
+
+      console.log("Saving preferences:", JSON.stringify(formattedPreferences, null, 2));
+      
       const response = await fetch('/api/preferences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(preferences) // Send preferences directly, not wrapped in an object
+        credentials: 'include', // Include cookies in the request
+        body: JSON.stringify(formattedPreferences)
       });
       
       if (response.ok) {
+        const result = await response.json();
+        console.log("Preferences saved successfully:", result);
         alert('Preferences saved successfully!');
       } else {
         const errorData = await response.json();
+        console.error('Error saving preferences. Status:', response.status);
         console.error('Error response from API:', errorData);
         alert(`Failed to save preferences: ${errorData.error || 'Unknown error'}`);
       }
@@ -767,40 +800,34 @@ No extra text or formatting.`,
   // Save weekly plan
   const saveWeeklyPlan = async () => {
     try {
-      // Transform the weekly plan data into the format expected by the API
+      const recipesList = [];
+      
+      // Get the start of the current week (Monday)
       const currentDate = new Date();
-      const weekStartDate = new Date(currentDate);
+      const currentWeekStart = new Date(currentDate);
       // Set to previous Monday
-      weekStartDate.setDate(currentDate.getDate() - (currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1));
+      currentWeekStart.setDate(currentDate.getDate() - (currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1));
       
-      // Extract all recipes from the weekly plan
-      const recipes = [];
-      const dayMapping = {
-        'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6
-      };
-      
+      // Flatten the weekly plan data into a list of recipes with their day and meal time
       for (const [day, meals] of Object.entries(weeklyPlan)) {
-        const dayOffset = dayMapping[day as keyof typeof dayMapping];
-        const mealDate = new Date(weekStartDate);
-        mealDate.setDate(weekStartDate.getDate() + dayOffset);
-        
-        for (const [mealType, mealRecipes] of Object.entries(meals)) {
-          // Cast the mealRecipes to Recipe[] to fix type issues
-          const typedRecipes = mealRecipes as Recipe[];
-          for (const recipe of typedRecipes) {
-            recipes.push({
+        for (const [mealTime, recipeList] of Object.entries(meals)) {
+          for (const recipe of recipeList) {
+            // Create a date string for this meal based on the day
+            const dayIndex = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(day);
+            const weekDate = new Date(currentWeekStart);
+            weekDate.setDate(weekDate.getDate() + dayIndex);
+            const plannedDate = weekDate.toISOString().split('T')[0];
+            
+            recipesList.push({
               recipeData: recipe,
-              plannedDate: mealDate.toISOString().split('T')[0], // YYYY-MM-DD format
-              mealType: mealType
+              plannedDate,
+              mealType: mealTime,
             });
           }
         }
       }
       
-      console.log('Saving weekly plan with formatted data:');
-      console.log('weekStartDate:', weekStartDate.toISOString().split('T')[0]);
-      console.log('recipes:', recipes.length, 'items');
-      
+      // Send data to the API
       const response = await fetch('/api/weekly-plan', {
         method: 'POST',
         headers: {
@@ -808,71 +835,26 @@ No extra text or formatting.`,
         },
         body: JSON.stringify({
           weeklyPlan: {
-            weekStartDate: weekStartDate.toISOString().split('T')[0],
-            recipes: recipes
-          }
+            weekStartDate: currentWeekStart.toISOString().split('T')[0],
+            recipes: recipesList,
+          },
         }),
       });
-
-      if (response.ok) {
-        alert('Weekly plan saved successfully!');
-        
-        // Reload the weekly plan data to show the latest saved version
-        try {
-          console.log('Refreshing weekly plan data...');
-          const refreshResponse = await fetch('/api/weekly-plan');
-          
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            if (refreshData.weeklyPlan) {
-              // Process and update the UI with the latest data
-              const plan = refreshData.weeklyPlan;
-              
-              // Create a new plan to hold the updated data
-              const newPlan: WeeklyPlan = {
-                Mon: { breakfast: [], lunch: [], dinner: [] },
-                Tue: { breakfast: [], lunch: [], dinner: [] },
-                Wed: { breakfast: [], lunch: [], dinner: [] },
-                Thu: { breakfast: [], lunch: [], dinner: [] },
-                Fri: { breakfast: [], lunch: [], dinner: [] },
-                Sat: { breakfast: [], lunch: [], dinner: [] },
-                Sun: { breakfast: [], lunch: [], dinner: [] },
-              };
-              
-              // Populate the plan with the returned data
-              ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => {
-                if (plan[day]) {
-                  const validMealTypes: MealTime[] = ['breakfast', 'lunch', 'dinner'];
-                  
-                  validMealTypes.forEach(mealType => {
-                    if (Array.isArray(plan[day][mealType])) {
-                      newPlan[day][mealType] = plan[day][mealType].map((recipe: Partial<Recipe>) => {
-                        return {
-                          name: recipe.name || 'Unnamed Recipe',
-                          ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
-                          instructions: Array.isArray(recipe.instructions) ? recipe.instructions : []
-                        };
-                      });
-                    }
-                  });
-                }
-              });
-              
-              setWeeklyPlan(newPlan);
-              console.log('Weekly plan refreshed successfully');
-            }
-          }
-        } catch (refreshError) {
-          console.error('Error refreshing weekly plan:', refreshError);
-        }
-      } else {
+      
+      if (!response.ok) {
         const errorData = await response.json();
-        console.error('Failed to save weekly plan:', errorData);
-        alert(`Failed to save weekly plan: ${errorData.error || errorData.message || 'Unknown error'}`);
+        throw new Error(errorData.error || 'Failed to save weekly plan');
       }
+      
+      const data = await response.json();
+      console.log('Weekly plan saved successfully:', data);
+      alert('Weekly plan saved successfully!');
+      
+      // Refresh the weekly plan data
+      fetchWeeklyPlan();
     } catch (error) {
       console.error('Error saving weekly plan:', error);
-      alert('An error occurred while saving the weekly plan');
+      alert(`Error saving weekly plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

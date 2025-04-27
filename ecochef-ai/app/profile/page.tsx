@@ -173,19 +173,64 @@ export default function ProfilePage() {
       }
       // Update the preference object with the proper type
       (updatedPreferences as Record<string, unknown>)[fieldName] = valueToSave;
-      // Prepare payload for API
+      
+      // Prepare payload for API - use proper column casing for the database
       const payload: Record<string, unknown> = {};
-      // Map the field names back to the database names
+      
+      // Map the field names with proper casing for the database
       switch (fieldName) {
+        case 'isVegetarian':
+          payload["isVegetarian"] = valueToSave;
+          break;
+        case 'isVegan':
+          payload["isVegan"] = valueToSave;
+          break;
+        case 'isGlutenFree':
+          payload["isGlutenFree"] = valueToSave;
+          break;
+        case 'isDairyFree':
+          payload["isDairyFree"] = valueToSave;
+          break;
+        case 'isNutFree':
+          payload["isNutFree"] = valueToSave;
+          break;
+        case 'maxCookingTime':
+          payload["maxCookingTime"] = valueToSave;
+          break;
+        case 'cookingSkillLevel': 
+          payload["cookingSkillLevel"] = valueToSave;
+          break;
+        case 'peopleCount':
+          payload["peopleCount"] = valueToSave;
+          break;
         case 'preferredCuisines':
-          payload.cuisinePreferences = valueToSave;
+          payload["cuisinePreferences"] = valueToSave;
           break;
         case 'dietGoals':
-          payload.healthGoals = valueToSave;
+          payload["healthGoals"] = valueToSave;
+          break;
+        case 'spicyPreference':
+          payload["spicyPreference"] = valueToSave;
+          break;
+        case 'sweetPreference':
+          payload["sweetPreference"] = valueToSave;
+          break;
+        case 'savoryPreference':
+          payload["savoryPreference"] = valueToSave;
+          break;
+        case 'allergies':
+          payload.allergies = valueToSave;
+          break;
+        case 'sustainabilityPreference':
+          payload["sustainabilityPreference"] = valueToSave;
+          break;
+        case 'nutritionFocus':
+          payload["nutritionFocus"] = valueToSave;
           break;
         default:
           payload[fieldName] = valueToSave;
       }
+      
       // Call API to update preferences
       const response = await fetch('/api/preferences', {
         method: 'POST',
