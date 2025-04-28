@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import AiDisclaimer from './components/AiDisclaimer';
 
 interface FeatureCardProps {
   title: string;
@@ -24,9 +25,13 @@ export default function Home() {
       <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
         Welcome to <span className="text-primary-600">EcoChef AI</span>
       </h1>
-      <p className="text-xl text-center text-gray-600 max-w-2xl mx-auto mb-12">
+      <p className="text-xl text-center text-gray-600 max-w-2xl mx-auto mb-6">
         Your personalized AI kitchen assistant for sustainable and delicious meals
       </p>
+      
+      <div className="max-w-2xl mx-auto mb-12">
+        <AiDisclaimer />
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <FeatureCard

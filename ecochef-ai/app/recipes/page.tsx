@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useDrag } from 'react-dnd';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import AiDisclaimer from '../components/AiDisclaimer';
 
 // Enhanced Recipe interface that includes both search results and custom/weekly plan recipes
 interface Recipe {
@@ -20,6 +21,7 @@ interface Recipe {
   ingredients?: string[];
   instructions?: string[];
   isCustom?: boolean;
+  isWeeklyPlan?: boolean;
 }
 
 // ItemType for drag and drop
@@ -147,15 +149,15 @@ function RecipeCard({ recipe, onEdit, onDelete }: {
 }
 
 export default function CookingAssistant() {
-  // State for recipes
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  
   // State for cooking assistant
   const [assistantMessage, setAssistantMessage] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [conversation, setConversation] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
 
   // Custom recipe states
   const [customRecipes, setCustomRecipes] = useState<Recipe[]>([]);
@@ -173,23 +175,40 @@ export default function CookingAssistant() {
 
   // Fetch initial recipes on page load
   useEffect(() => {
-    fetchRecipes();
     fetchCustomRecipes();
     fetchWeeklyPlanRecipes();
   }, []);
 
-  // Function to search recipes
-  const fetchRecipes = async (query: string = '') => {
-    setIsSearching(true);
-    try {
-      const response = await fetch(`/api/recipe-search?query=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      setRecipes(data.recipes);
-    } catch (error) {
-      console.error('Error fetching recipes:', error);
-    } finally {
-      setIsSearching(false);
+  // Clear filtered recipes when search query is empty
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredRecipes([]);
     }
+  }, [searchQuery]);
+
+  // Handle recipe search form submission
+  const handleRecipeSearch = (e: FormEvent) => {
+    e.preventDefault();
+    setIsSearching(true);
+    
+    // Small timeout to show loading state
+    setTimeout(() => {
+      // Filter recipes based on search query directly here
+      const query = searchQuery.toLowerCase();
+      const allRecipes = [...customRecipes, ...weeklyPlanRecipes];
+      
+      const filtered = allRecipes.filter(recipe => {
+        const name = (recipe.name || recipe.title || '').toLowerCase();
+        const ingredients = recipe.ingredients ? recipe.ingredients.join(' ').toLowerCase() : '';
+        const cuisine = (recipe.cuisine || '').toLowerCase();
+        
+        return name.includes(query) || ingredients.includes(query) || cuisine.includes(query);
+      });
+      
+      setFilteredRecipes(filtered);
+      setIsSearching(false);
+      console.log(`Found ${filtered.length} recipes matching "${searchQuery}"`);
+    }, 300);
   };
 
   // Fetch custom recipes from database API
@@ -218,49 +237,35 @@ export default function CookingAssistant() {
   // Fetch recipes from the weekly plan
   const fetchWeeklyPlanRecipes = async () => {
     try {
-      console.log('Fetching weekly plan recipes...');
-      const response = await fetch('/api/weekly-plan', {
+      console.log('Fetching recipes from all weekly plans...');
+      
+      const response = await fetch('/api/all-plans', {
         credentials: 'include' // Include cookies in the request
       });
       
+      console.log('All plans API response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        if (data.weeklyPlan) {
-          const planRecipes: Recipe[] = [];
-          
-          // Extract unique recipes from each day and meal time
-          Object.keys(data.weeklyPlan).forEach(day => {
-            if (day !== 'weekStartDate' && day !== 'id' && day !== 'userid') {
-              ['breakfast', 'lunch', 'dinner'].forEach(mealTime => {
-                if (Array.isArray(data.weeklyPlan[day][mealTime])) {
-                  data.weeklyPlan[day][mealTime].forEach((recipe: Recipe) => {
-                    // Check if recipe with same name already exists in array
-                    if (!planRecipes.some(r => r.name === recipe.name)) {
-                      planRecipes.push(recipe);
-                    }
-                  });
-                }
-              });
-            }
-          });
-          
-          console.log(`Fetched ${planRecipes.length} unique recipes from weekly plan`);
-          setWeeklyPlanRecipes(planRecipes);
+        console.log('All plans API response:', data);
+        
+        if (data.recipes && Array.isArray(data.recipes) && data.recipes.length > 0) {
+          console.log(`Found ${data.recipes.length} unique recipes across all plans`);
+          setWeeklyPlanRecipes(data.recipes);
+        } else {
+          console.log('No recipes found in any weekly plans');
+          setWeeklyPlanRecipes([]);
         }
       } else {
-        console.error('Error fetching weekly plan recipes:', response.status);
-        const errorData = await response.text();
-        console.error('Error details:', errorData);
+        console.error('Error fetching all plans:', response.status);
+        const errorText = await response.text();
+        console.error('Error details:', errorText);
+        setWeeklyPlanRecipes([]);
       }
     } catch (error) {
       console.error('Error fetching weekly plan recipes:', error);
+      setWeeklyPlanRecipes([]);
     }
-  };
-
-  // Handle recipe search form submission
-  const handleRecipeSearch = (e: FormEvent) => {
-    e.preventDefault();
-    fetchRecipes(searchQuery);
   };
 
   // Handle sending message to cooking assistant
@@ -604,7 +609,7 @@ export default function CookingAssistant() {
               <form onSubmit={handleRecipeSearch} className="flex gap-4">
                 <input
                   type="text"
-                  placeholder="Search for recipes..."
+                  placeholder="Search your recipes..."
                   className="input-field flex-grow"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -618,7 +623,30 @@ export default function CookingAssistant() {
                 </button>
               </form>
               
-              {customRecipes.length > 0 && (
+              {/* Only show search results when there's a search query */}
+              {searchQuery.trim() && (
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Search Results</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {filteredRecipes.length > 0 ? (
+                      filteredRecipes.map((recipe, index) => (
+                        <RecipeCard 
+                          key={`search-${index}`} 
+                          recipe={recipe} 
+                          onEdit={recipe.isCustom ? handleEditRecipe : undefined} 
+                          onDelete={recipe.isCustom ? handleDeleteRecipe : undefined} 
+                        />
+                      ))
+                    ) : (
+                      <div className="col-span-2 p-8 text-center text-gray-500">
+                        No recipes found. Try a different search term.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {customRecipes.length > 0 && !searchQuery.trim() && (
                 <div>
                   <h3 className="text-lg font-medium mb-3">Your Custom Recipes</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -634,7 +662,7 @@ export default function CookingAssistant() {
                 </div>
               )}
 
-              {weeklyPlanRecipes.length > 0 && (
+              {weeklyPlanRecipes.length > 0 && !searchQuery.trim() && (
                 <div>
                   <h3 className="text-lg font-medium mb-3">Recipes From Your Weekly Plan</h3>
                   <p className="text-sm text-gray-600 mb-2">
@@ -647,25 +675,13 @@ export default function CookingAssistant() {
                   </div>
                 </div>
               )}
-              
-              <h3 className="text-lg font-medium mb-3">Recipe Search Results</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {recipes.length > 0 ? (
-                  recipes.map((recipe) => (
-                    <RecipeCard key={recipe.id} recipe={recipe} />
-                  ))
-                ) : (
-                  <div className="col-span-2 p-8 text-center text-gray-500">
-                    No recipes found. Try a different search term.
-                  </div>
-                )}
-              </div>
             </div>
           </section>
 
           {/* Cooking Assistant Section */}
           <section className="card">
             <h2 className="text-xl font-semibold mb-4">Chef Claude</h2>
+            <AiDisclaimer className="mb-4" />
             <div className="mb-3 text-sm text-gray-600">
               <p>Ask me anything about:</p>
               <ul className="list-disc pl-5 mt-1 space-y-1">

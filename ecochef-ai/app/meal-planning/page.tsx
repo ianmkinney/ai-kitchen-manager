@@ -6,6 +6,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useDrag, useDrop } from 'react-dnd';
 import { format } from 'date-fns';
+import AiDisclaimer from '../components/AiDisclaimer';
 
 // Define types for drag-and-drop
 const ItemType = {
@@ -1081,6 +1082,7 @@ No extra text or formatting.`,
             {/* AI Suggestion Section - Reduced height */}
             <section className="card h-72 sm:h-96 overflow-y-auto">
               <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">AI Meal Suggestions</h2>
+              <AiDisclaimer className="mb-4" />
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <input

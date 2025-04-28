@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import AiDisclaimer from '../components/AiDisclaimer';
 // Remove direct Supabase import as we'll use the API routes
 // import { supabase } from '../lib/supabase';
 
@@ -269,6 +270,7 @@ export default function Pantry() {
         {/* AI Shopping Assistant */}
         <section className="card">
           <h2 className="text-xl font-semibold mb-4">AI Shopping Assistant</h2>
+          <AiDisclaimer className="mb-4" />
           <p className="text-sm text-gray-600 mb-4">
             Get a personalized shopping list based on what&apos;s missing from your pantry and your dietary preferences.
           </p>
