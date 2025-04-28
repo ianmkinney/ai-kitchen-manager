@@ -1040,29 +1040,31 @@ No extra text or formatting.`,
     if (shoppingList.length === 0) return;
     
     try {
-      // Create a promise for each item
-      const addPromises = shoppingList.map(item => 
-        fetch('/api/shopping', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: item.name,
-            category: item.category
-          }),
-        })
-      );
+      // Instead of using Supabase directly, use the API endpoint
+      // which handles authentication properly on the server side
+      const response = await fetch('/api/shopping/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: shoppingList }),
+        credentials: 'include', // Include credentials to send cookies
+      });
       
-      // Wait for all items to be added
-      await Promise.all(addPromises);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add items to shopping list');
+      }
+      
+      const data = await response.json();
+      console.log(`Added ${data.addedCount || 'all'} items to shopping list`);
       
       alert('Added all items to your shopping list in the pantry!');
       setShowShoppingList(false);
       
     } catch (error) {
       console.error('Error adding to shopping list:', error);
-      alert('Failed to add items to shopping list. Please try again.');
+      alert(`Failed to add items to shopping list: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -1076,427 +1078,423 @@ No extra text or formatting.`,
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
-          {/* Left Column - Preferences Section */}
-          <div className="flex flex-col space-y-4 sm:space-y-8">
-            {/* AI Suggestion Section - Reduced height */}
-            <section className="card h-72 sm:h-96 overflow-y-auto">
-              <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">AI Meal Suggestions</h2>
-              <AiDisclaimer className="mb-4" />
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <input
-                    type="text"
-                    placeholder="Ask for meal suggestions..."
-                    className="input-field"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleGetMealIdeas();
-                      }
-                    }}
-                  />
-                  <button 
-                    className="btn-primary whitespace-nowrap"
-                    onClick={(e) => {
+        {/* Main Content - Single column on mobile, two columns on larger screens */}
+        <div className="flex flex-col space-y-4 sm:space-y-8">
+          {/* AI Suggestion Section - First on both mobile and desktop */}
+          <section className="card h-72 sm:h-96 overflow-y-auto">
+            <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">AI Meal Suggestions</h2>
+            <AiDisclaimer className="mb-4" />
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <input
+                  type="text"
+                  placeholder="Ask for meal suggestions..."
+                  className="input-field"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
                       e.preventDefault();
                       handleGetMealIdeas();
-                    }}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Loading...' : 'Get Ideas'}
-                  </button>
-                </div>
-                {isLoading && (
-                  <div className="relative w-full h-1 bg-gray-200 mt-2">
-                    <div
-                      className="absolute top-0 left-0 h-full bg-blue-500"
-                      style={{ width: `${loadingProgress}%` }}
-                    ></div>
-                  </div>
-                )}
-                
-                {/* Custom Recipes Section */}
-                {customRecipes.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="text-md font-medium mb-2">Your Custom Recipes</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {customRecipes.map((recipe, index) => (
-                        <DraggableRecipe key={`custom-${index}`} recipe={recipe} />
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Drag and drop to add to your meal plan
-                    </p>
-                  </div>
-                )}
-                
-                {/* Link to create custom recipes if none exist */}
-                {customRecipes.length === 0 && !isLoading && (
-                  <div className="mt-2 mb-2">
-                    <p className="text-sm text-gray-600">
-                      <Link href="/recipes" className="text-blue-600 hover:text-blue-800">
-                        Create custom recipes
-                      </Link> to see them here and add to your meal plan.
-                    </p>
-                  </div>
-                )}
-                
-                {/* AI Generated Recipes Section */}
-                {Array.isArray(aiResponse.meals) && aiResponse.meals.length > 0 && (
-                  <div>
-                    <h3 className="text-md font-medium mb-2">AI Generated Recipes</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {aiResponse.meals.map((recipe, index) => (
-                        <DraggableRecipe key={`ai-${index}`} recipe={recipe} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {loadingProgress === 100 && aiResponse.otherContent && aiResponse.otherContent.length > 0 && (
-                  <div className="text-sm text-gray-600 mb-4">
-                    {aiResponse.otherContent.map((content, index) => (
-                      <p key={index} className="mb-2">{content}</p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
-            <section className="card">
-              <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Your Preferences</h2>
-              <form className="space-y-4" onSubmit={savePreferences}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Dietary Restrictions */}
-                  <div className="col-span-1 sm:col-span-2">
-                    <label className="block text-sm font-medium mb-1">
-                      Dietary Restrictions
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="isVegetarian"
-                          checked={preferences.isVegetarian}
-                          onChange={handlePreferenceChange}
-                          className="mr-2"
-                        />
-                        Vegetarian
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="isVegan"
-                          checked={preferences.isVegan}
-                          onChange={handlePreferenceChange}
-                          className="mr-2"
-                        />
-                        Vegan
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="isGlutenFree"
-                          checked={preferences.isGlutenFree}
-                          onChange={handlePreferenceChange}
-                          className="mr-2"
-                        />
-                        Gluten-Free
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="isDairyFree"
-                          checked={preferences.isDairyFree}
-                          onChange={handlePreferenceChange}
-                          className="mr-2"
-                        />
-                        Dairy-Free
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="isNutFree"
-                          checked={preferences.isNutFree}
-                          onChange={handlePreferenceChange}
-                          className="mr-2"
-                        />
-                        Nut-Free
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {/* Cooking Options */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Cooking Time (minutes)
-                    </label>
-                    <select 
-                      name="maxCookingTime"
-                      className="input-field"
-                      value={preferences.maxCookingTime}
-                      onChange={handlePreferenceChange}
-                    >
-                      <option value="15">Quick (15 mins)</option>
-                      <option value="30">Medium (30 mins)</option>
-                      <option value="60">Long (60 mins)</option>
-                      <option value="120">Any duration</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Number of People
-                    </label>
-                    <select 
-                      name="peopleCount"
-                      className="input-field"
-                      value={preferences.peopleCount}
-                      onChange={handlePreferenceChange}
-                    >
-                      <option value="1">1 person</option>
-                      <option value="2">2 people</option>
-                      <option value="4">4 people</option>
-                      <option value="6">6+ people</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Cuisine Preference
-                    </label>
-                    <select 
-                      name="cuisine"
-                      className="input-field"
-                      value={preferences.cuisine}
-                      onChange={handlePreferenceChange}
-                    >
-                      <option value="Any">Any Cuisine</option>
-                      <option value="Italian">Italian</option>
-                      <option value="Mexican">Mexican</option>
-                      <option value="Asian">Asian</option>
-                      <option value="Mediterranean">Mediterranean</option>
-                      <option value="Indian">Indian</option>
-                      <option value="American">American</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      Cooking Skill Level
-                    </label>
-                    <select 
-                      name="cookingSkillLevel"
-                      className="input-field"
-                      value={preferences.cookingSkillLevel || 'intermediate'}
-                      onChange={handlePreferenceChange}
-                    >
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
-                  </div>
-                  
-                  {/* Taste Preference Sliders */}
-                  <div className="col-span-2">
-                    <h3 className="block text-sm font-medium mb-2">Taste Preferences (0-10)</h3>
-                    
-                    <div className="mb-4">
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm">Spicy: {preferences.spicyPreference || 5}</label>
-                      </div>
-                      <input
-                        type="range"
-                        name="spicyPreference"
-                        min="0"
-                        max="10"
-                        step="1"
-                        value={preferences.spicyPreference || 5}
-                        onChange={handlePreferenceChange}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>Not Spicy</span>
-                        <span>Very Spicy</span>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm">Sweet: {preferences.sweetPreference || 5}</label>
-                      </div>
-                      <input
-                        type="range"
-                        name="sweetPreference"
-                        min="0"
-                        max="10"
-                        step="1"
-                        value={preferences.sweetPreference || 5}
-                        onChange={handlePreferenceChange}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>Not Sweet</span>
-                        <span>Very Sweet</span>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm">Savory: {preferences.savoryPreference || 5}</label>
-                      </div>
-                      <input
-                        type="range"
-                        name="savoryPreference"
-                        min="0"
-                        max="10"
-                        step="1"
-                        value={preferences.savoryPreference || 5}
-                        onChange={handlePreferenceChange}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>Less Savory</span>
-                        <span>Very Savory</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <button type="submit" className="btn-primary w-full">
-                  Save Preferences
+                    }
+                  }}
+                />
+                <button 
+                  className="btn-primary whitespace-nowrap"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleGetMealIdeas();
+                  }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Loading...' : 'Get Ideas'}
                 </button>
-              </form>
-            </section>
-          </div>
-
-          {/* Right Column - AI Suggestions and Weekly Plan */}
-          <div className="flex flex-col space-y-4 sm:space-y-8">
-            
-            {/* Weekly Plan Section with week selector */}
-            <section className="card">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
-                <div>
-                  <h2 className="text-lg sm:text-xl font-semibold">Your Weekly Plan</h2>
-                  {weekDates['Mon'] && weekDates['Sun'] && (
-                    <p className="text-xs text-gray-500">Week of {weekDates['Mon']} - {weekDates['Sun']}</p>
-                  )}
-                </div>
-                
-                {/* Week Selector */}
-                <div className="flex items-center mt-2 sm:mt-0">
-                  <button 
-                    onClick={() => setSelectedWeekOffset(prev => prev - 1)}
-                    className="p-1 rounded hover:bg-gray-100 text-gray-700"
-                    aria-label="Previous week"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  
-                  <select 
-                    className="text-sm mx-2 p-1 border rounded"
-                    value={selectedWeekOffset}
-                    onChange={(e) => setSelectedWeekOffset(Number(e.target.value))}
-                  >
-                    {availableWeeks.map((week, index) => (
-                      <option key={index} value={week.offset}>
-                        {week.startDate} - {week.endDate} {week.offset === 0 ? '(Current)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  <button 
-                    onClick={() => setSelectedWeekOffset(prev => prev + 1)}
-                    className="p-1 rounded hover:bg-gray-100 text-gray-700"
-                    aria-label="Next week"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-                
-                {isLoadingPlan && (
-                  <span className="text-sm text-blue-500 mt-2 sm:mt-0">Loading your saved plan...</span>
-                )}
               </div>
+              {isLoading && (
+                <div className="relative w-full h-1 bg-gray-200 mt-2">
+                  <div
+                    className="absolute top-0 left-0 h-full bg-blue-500"
+                    style={{ width: `${loadingProgress}%` }}
+                  ></div>
+                </div>
+              )}
               
-              {/* Mobile-optimized plan layout */}
-              <div className="block sm:hidden">
-                {/* Mobile view: One day at a time, scrollable horizontally */}
-                <div className="flex overflow-x-auto pb-4 space-x-4">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <div key={day} className="flex-shrink-0 w-[85vw]">
-                      <DroppableDay
-                        day={day}
-                        dailyMeals={weeklyPlan[day]}
-                        onDrop={handleDrop}
-                        onRemove={removeMeal}
-                        date={weekDates[day]}
-                      />
-                    </div>
+              {/* Custom Recipes Section */}
+              {customRecipes.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-md font-medium mb-2">Your Custom Recipes</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {customRecipes.map((recipe, index) => (
+                      <DraggableRecipe key={`custom-${index}`} recipe={recipe} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Drag and drop to add to your meal plan
+                  </p>
+                </div>
+              )}
+              
+              {/* Link to create custom recipes if none exist */}
+              {customRecipes.length === 0 && !isLoading && (
+                <div className="mt-2 mb-2">
+                  <p className="text-sm text-gray-600">
+                    <Link href="/recipes" className="text-blue-600 hover:text-blue-800">
+                      Create custom recipes
+                    </Link> to see them here and add to your meal plan.
+                  </p>
+                </div>
+              )}
+              
+              {/* AI Generated Recipes Section */}
+              {Array.isArray(aiResponse.meals) && aiResponse.meals.length > 0 && (
+                <div>
+                  <h3 className="text-md font-medium mb-2">AI Generated Recipes</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {aiResponse.meals.map((recipe, index) => (
+                      <DraggableRecipe key={`ai-${index}`} recipe={recipe} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {loadingProgress === 100 && aiResponse.otherContent && aiResponse.otherContent.length > 0 && (
+                <div className="text-sm text-gray-600 mb-4">
+                  {aiResponse.otherContent.map((content, index) => (
+                    <p key={index} className="mb-2">{content}</p>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Swipe left/right to see all days</p>
+              )}
+            </div>
+          </section>
+          
+          {/* Weekly Plan Section - Second on both mobile and desktop */}
+          <section className="card">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+              <div>
+                <h2 className="text-lg sm:text-xl font-semibold">Your Weekly Plan</h2>
+                {weekDates['Mon'] && weekDates['Sun'] && (
+                  <p className="text-xs text-gray-500">Week of {weekDates['Mon']} - {weekDates['Sun']}</p>
+                )}
               </div>
               
-              {/* Desktop view: Split into two rows */}
-              <div className="hidden sm:block">
-                {/* First row: Monday-Thursday */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium mb-2 text-gray-500">Monday - Thursday</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {['Mon', 'Tue', 'Wed', 'Thu'].map((day) => (
-                      <DroppableDay
-                        key={day}
-                        day={day}
-                        dailyMeals={weeklyPlan[day]}
-                        onDrop={handleDrop}
-                        onRemove={removeMeal}
-                        date={weekDates[day]}
+              {/* Week Selector */}
+              <div className="flex items-center mt-2 sm:mt-0">
+                <button 
+                  onClick={() => setSelectedWeekOffset(prev => prev - 1)}
+                  className="p-1 rounded hover:bg-gray-100 text-gray-700"
+                  aria-label="Previous week"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <select 
+                  className="text-sm mx-2 p-1 border rounded"
+                  value={selectedWeekOffset}
+                  onChange={(e) => setSelectedWeekOffset(Number(e.target.value))}
+                >
+                  {availableWeeks.map((week, index) => (
+                    <option key={index} value={week.offset}>
+                      {week.startDate} - {week.endDate} {week.offset === 0 ? '(Current)' : ''}
+                    </option>
+                  ))}
+                </select>
+                
+                <button 
+                  onClick={() => setSelectedWeekOffset(prev => prev + 1)}
+                  className="p-1 rounded hover:bg-gray-100 text-gray-700"
+                  aria-label="Next week"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              
+              {isLoadingPlan && (
+                <span className="text-sm text-blue-500 mt-2 sm:mt-0">Loading your saved plan...</span>
+              )}
+            </div>
+            
+            {/* Mobile-optimized plan layout */}
+            <div className="block sm:hidden">
+              {/* Mobile view: One day at a time, scrollable horizontally */}
+              <div className="flex overflow-x-auto pb-4 space-x-4">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                  <div key={day} className="flex-shrink-0 w-[85vw]">
+                    <DroppableDay
+                      day={day}
+                      dailyMeals={weeklyPlan[day]}
+                      onDrop={handleDrop}
+                      onRemove={removeMeal}
+                      date={weekDates[day]}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Swipe left/right to see all days</p>
+            </div>
+            
+            {/* Desktop view: Split into two rows */}
+            <div className="hidden sm:block">
+              {/* First row: Monday-Thursday */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium mb-2 text-gray-500">Monday - Thursday</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {['Mon', 'Tue', 'Wed', 'Thu'].map((day) => (
+                    <DroppableDay
+                      key={day}
+                      day={day}
+                      dailyMeals={weeklyPlan[day]}
+                      onDrop={handleDrop}
+                      onRemove={removeMeal}
+                      date={weekDates[day]}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Second row: Friday-Sunday */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium mb-2 text-gray-500">Friday - Sunday</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {['Fri', 'Sat', 'Sun'].map((day) => (
+                    <DroppableDay
+                      key={day}
+                      day={day}
+                      dailyMeals={weeklyPlan[day]}
+                      onDrop={handleDrop}
+                      onRemove={removeMeal}
+                      date={weekDates[day]}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 mt-4">
+              <button
+                className="btn-primary"
+                onClick={saveWeeklyPlan}
+              >
+                Save Weekly Plan
+              </button>
+              <button
+                className={`btn-secondary ${isGeneratingList ? 'opacity-50' : ''}`}
+                onClick={generateShoppingList}
+                disabled={isGeneratingList}
+              >
+                {isGeneratingList ? 'Generating...' : 'Generate Shopping List'}
+              </button>
+            </div>
+          </section>
+          
+          {/* Preferences Section - Last on both mobile and desktop */}
+          <section className="card">
+            <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Your Preferences</h2>
+            <form className="space-y-4" onSubmit={savePreferences}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Dietary Restrictions */}
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1">
+                    Dietary Restrictions
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="isVegetarian"
+                        checked={preferences.isVegetarian}
+                        onChange={handlePreferenceChange}
+                        className="mr-2"
                       />
-                    ))}
+                      Vegetarian
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="isVegan"
+                        checked={preferences.isVegan}
+                        onChange={handlePreferenceChange}
+                        className="mr-2"
+                      />
+                      Vegan
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="isGlutenFree"
+                        checked={preferences.isGlutenFree}
+                        onChange={handlePreferenceChange}
+                        className="mr-2"
+                      />
+                      Gluten-Free
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="isDairyFree"
+                        checked={preferences.isDairyFree}
+                        onChange={handlePreferenceChange}
+                        className="mr-2"
+                      />
+                      Dairy-Free
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="isNutFree"
+                        checked={preferences.isNutFree}
+                        onChange={handlePreferenceChange}
+                        className="mr-2"
+                      />
+                      Nut-Free
+                    </label>
                   </div>
                 </div>
                 
-                {/* Second row: Friday-Sunday */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium mb-2 text-gray-500">Friday - Sunday</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Fri', 'Sat', 'Sun'].map((day) => (
-                      <DroppableDay
-                        key={day}
-                        day={day}
-                        dailyMeals={weeklyPlan[day]}
-                        onDrop={handleDrop}
-                        onRemove={removeMeal}
-                        date={weekDates[day]}
-                      />
-                    ))}
+                {/* Cooking Options */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Cooking Time (minutes)
+                  </label>
+                  <select 
+                    name="maxCookingTime"
+                    className="input-field"
+                    value={preferences.maxCookingTime}
+                    onChange={handlePreferenceChange}
+                  >
+                    <option value="15">Quick (15 mins)</option>
+                    <option value="30">Medium (30 mins)</option>
+                    <option value="60">Long (60 mins)</option>
+                    <option value="120">Any duration</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Number of People
+                  </label>
+                  <select 
+                    name="peopleCount"
+                    className="input-field"
+                    value={preferences.peopleCount}
+                    onChange={handlePreferenceChange}
+                  >
+                    <option value="1">1 person</option>
+                    <option value="2">2 people</option>
+                    <option value="4">4 people</option>
+                    <option value="6">6+ people</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Cuisine Preference
+                  </label>
+                  <select 
+                    name="cuisine"
+                    className="input-field"
+                    value={preferences.cuisine}
+                    onChange={handlePreferenceChange}
+                  >
+                    <option value="Any">Any Cuisine</option>
+                    <option value="Italian">Italian</option>
+                    <option value="Mexican">Mexican</option>
+                    <option value="Asian">Asian</option>
+                    <option value="Mediterranean">Mediterranean</option>
+                    <option value="Indian">Indian</option>
+                    <option value="American">American</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Cooking Skill Level
+                  </label>
+                  <select 
+                    name="cookingSkillLevel"
+                    className="input-field"
+                    value={preferences.cookingSkillLevel || 'beginner'}
+                    onChange={handlePreferenceChange}
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+                
+                {/* Taste Preference Sliders */}
+                <div className="col-span-2">
+                  <h3 className="block text-sm font-medium mb-2">Taste Preferences (0-10)</h3>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm">Spicy: {preferences.spicyPreference || 5}</label>
+                    </div>
+                    <input
+                      type="range"
+                      name="spicyPreference"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={preferences.spicyPreference || 5}
+                      onChange={handlePreferenceChange}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Not Spicy</span>
+                      <span>Very Spicy</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm">Sweet: {preferences.sweetPreference || 5}</label>
+                    </div>
+                    <input
+                      type="range"
+                      name="sweetPreference"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={preferences.sweetPreference || 5}
+                      onChange={handlePreferenceChange}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Not Sweet</span>
+                      <span>Very Sweet</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm">Savory: {preferences.savoryPreference || 5}</label>
+                    </div>
+                    <input
+                      type="range"
+                      name="savoryPreference"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={preferences.savoryPreference || 5}
+                      onChange={handlePreferenceChange}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Less Savory</span>
+                      <span>Very Savory</span>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 mt-4">
-                <button
-                  className="btn-primary"
-                  onClick={saveWeeklyPlan}
-                >
-                  Save Weekly Plan
-                </button>
-                <button
-                  className={`btn-secondary ${isGeneratingList ? 'opacity-50' : ''}`}
-                  onClick={generateShoppingList}
-                  disabled={isGeneratingList}
-                >
-                  {isGeneratingList ? 'Generating...' : 'Generate Shopping List'}
-                </button>
-              </div>
-            </section>
-          </div>
+              <button type="submit" className="btn-primary w-full">
+                Save Preferences
+              </button>
+            </form>
+          </section>
         </div>
         
         {/* Shopping List Modal */}
@@ -1514,6 +1512,7 @@ No extra text or formatting.`,
                       These items aren&apos;t in your pantry but are needed for your weekly plan:
                     </p>
                   </div>
+                  
                   
                   <div className="space-y-2 max-h-[40vh] overflow-y-auto mb-4">
                     {/* Group by category */}

@@ -201,4 +201,142 @@ SELECT 'Custom recipes table check:' AS check_name;
 SELECT column_name, data_type, is_nullable 
 FROM information_schema.columns 
 WHERE table_name = 'custom_recipes' 
-ORDER BY ordinal_position; 
+ORDER BY ordinal_position;
+
+-- Add caloriesPerServing and servings fields to custom recipes
+ALTER TABLE "public"."custom_recipes" 
+  ADD COLUMN IF NOT EXISTS "caloriesPerServing" INTEGER,
+  ADD COLUMN IF NOT EXISTS "servings" INTEGER,
+  ADD COLUMN IF NOT EXISTS "totalProtein" INTEGER,
+  ADD COLUMN IF NOT EXISTS "totalCarbs" INTEGER,
+  ADD COLUMN IF NOT EXISTS "totalFat" INTEGER;
+
+-- Add nutritionSummary field to weekly_plans
+ALTER TABLE "public"."weekly_plans" 
+  ADD COLUMN IF NOT EXISTS "nutritionSummary" JSONB DEFAULT '{}'::jsonb;
+
+-- Update existing recipes to include nutrition fields with default data
+UPDATE "public"."weekly_plan_recipes"
+SET "recipeData" = jsonb_set(
+  jsonb_set(
+    jsonb_set(
+      jsonb_set(
+        jsonb_set(
+          "recipeData",
+          '{caloriesPerServing}',
+          '400'::jsonb,
+          true
+        ),
+        '{servings}',
+        '4'::jsonb,
+        true
+      ),
+      '{totalProtein}',
+      '15'::jsonb,
+      true
+    ),
+    '{totalCarbs}',
+    '40'::jsonb,
+    true
+  ),
+  '{totalFat}',
+  '20'::jsonb,
+  true
+)
+WHERE NOT ("recipeData"::jsonb ? 'caloriesPerServing');
+
+-- Set default values for custom recipes
+UPDATE "public"."custom_recipes"
+SET 
+  "caloriesPerServing" = 400,
+  "servings" = 4,
+  "totalProtein" = 15,
+  "totalCarbs" = 40,
+  "totalFat" = 20
+WHERE "caloriesPerServing" IS NULL;
+
+-- Create function to set default nutrition values for new recipes
+CREATE OR REPLACE FUNCTION trigger_nutrition_estimate()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW."caloriesPerServing" IS NULL THEN
+    NEW."caloriesPerServing" := 400;
+  END IF;
+  
+  IF NEW."servings" IS NULL THEN
+    NEW."servings" := 4;
+  END IF;
+  
+  IF NEW."totalProtein" IS NULL THEN
+    NEW."totalProtein" := 15;
+  END IF;
+  
+  IF NEW."totalCarbs" IS NULL THEN
+    NEW."totalCarbs" := 40;
+  END IF;
+  
+  IF NEW."totalFat" IS NULL THEN
+    NEW."totalFat" := 20;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically set default nutrition values
+DROP TRIGGER IF EXISTS set_nutrition_defaults ON "public"."custom_recipes";
+CREATE TRIGGER set_nutrition_defaults
+BEFORE INSERT ON "public"."custom_recipes"
+FOR EACH ROW
+EXECUTE FUNCTION trigger_nutrition_estimate();
+
+-- Create ShoppingListItem table if it doesn't exist
+CREATE TABLE IF NOT EXISTS "public"."ShoppingListItem" (
+  "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "name" TEXT NOT NULL,
+  "category" TEXT NOT NULL DEFAULT 'Other',
+  "quantity" FLOAT NOT NULL DEFAULT 1,
+  "unit" TEXT NOT NULL DEFAULT 'item',
+  "isChecked" BOOLEAN NOT NULL DEFAULT false,
+  "userId" UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  "createdAt" TIMESTAMPTZ DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ DEFAULT now()
+);
+
+-- Create indexes for ShoppingListItem table
+CREATE INDEX IF NOT EXISTS "idx_shopping_list_items_user_id" ON "public"."ShoppingListItem" ("userId");
+CREATE INDEX IF NOT EXISTS "idx_shopping_list_items_category" ON "public"."ShoppingListItem" ("category");
+
+-- Enable row level security
+ALTER TABLE "public"."ShoppingListItem" ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for ShoppingListItem table
+CREATE POLICY "Users can view their own shopping list items" ON "public"."ShoppingListItem"
+FOR SELECT USING (auth.uid() = "userId");
+
+CREATE POLICY "Users can insert their own shopping list items" ON "public"."ShoppingListItem"
+FOR INSERT WITH CHECK (auth.uid() = "userId");
+
+CREATE POLICY "Users can update their own shopping list items" ON "public"."ShoppingListItem"
+FOR UPDATE USING (auth.uid() = "userId");
+
+CREATE POLICY "Users can delete their own shopping list items" ON "public"."ShoppingListItem"
+FOR DELETE USING (auth.uid() = "userId");
+
+-- Verify the changes were made
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'custom_recipes' 
+AND column_name IN ('caloriesPerServing', 'servings', 'totalProtein', 'totalCarbs', 'totalFat');
+
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'weekly_plans' 
+AND column_name = 'nutritionSummary';
+
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name = 'ShoppingListItem';
+
+COMMIT; 

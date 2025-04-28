@@ -9,6 +9,7 @@ This directory contains migration scripts to update the EcoChef-AI database sche
 - `estimate_recipe_nutrition.sql`: Sets default nutrition values for existing recipes and creates a trigger for new recipes
 - `run_all_updates.sql`: Master script that runs all migrations in the correct order
 - `combined_migration.sql`: **RECOMMENDED** - Single file containing all migrations combined for easy execution
+- `shopping_list_table.sql`: Migration file that adds the ShoppingListItem table for storing shopping list items
 
 ## How to Run the Migration
 
@@ -80,4 +81,16 @@ Existing recipes in both `custom_recipes` and `weekly_plan_recipes` tables will 
 - A JSON structure for detailed nutrition information
 - A flag indicating that the nutrition values are estimated
 
-A new trigger `set_default_nutrition` is also created to automatically set default nutrition values for new recipes. 
+A new trigger `set_default_nutrition` is also created to automatically set default nutrition values for new recipes.
+
+### Shopping List Table Migration
+
+The `shopping_list_table.sql` file adds:
+
+- A `ShoppingListItem` table for storing shopping list items
+- Row-level security policies to ensure users can only access their own items
+- Appropriate indexes for performance optimization
+
+## Troubleshooting
+
+If you encounter errors about columns already existing, use the `shopping_list_table.sql` script instead of the combined migration file, as it focuses only on creating the ShoppingListItem table. 
