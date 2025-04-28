@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
 import { getTestUserDataWithAdmin } from '../../lib/admin-check';
-import { createAdminClient } from '../../lib/admin-check';
 
 // Define types for our day and meal structures
 type MealType = 'breakfast' | 'lunch' | 'dinner';
@@ -11,6 +10,12 @@ type RecipeData = {
   name?: string;
   ingredients?: string[];
   instructions?: string[];
+  servingSize?: number;
+  calories?: number | null;
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
+  nutritionInfo?: Record<string, unknown>;
   [key: string]: unknown; // Allow for additional properties
 };
 
@@ -30,18 +35,52 @@ type WeeklyPlanMap = {
   [key in DayName]: DayMeals;
 };
 
+// Define a type for recipe objects in arrays
+type RecipeObject = {
+  weeklyPlanId?: string;
+  recipeData?: RecipeData;
+  plannedDate?: string;
+  mealType?: string;
+  [key: string]: unknown;
+};
+
 // GET - Retrieve weekly plan for the current user
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const weekStartDate = url.searchParams.get('weekStartDate');
+  
   try {
     const user = await getCurrentUser(request);
-    console.log('GET /api/weekly-plan: User:', user);
-
     if (!user) {
       return NextResponse.json(
         { error: 'You must be logged in to access this resource' },
         { status: 401 }
       );
     }
+    
+    // Create server client 
+    const supabase = await createServerClient();
+    
+    // Get weekly plan for the specific week start date
+    console.log('Fetching weekly plan for weekStartDate:', weekStartDate);
+    const { data: weeklyPlans, error: weeklyPlansError } = await supabase
+      .from('weekly_plans')
+      .select('*')
+      .eq('userid', user.id)
+      .eq('weekStartDate', weekStartDate);
+    
+    console.log('Weekly plans found:', weeklyPlans?.length || 0);
+
+    if (weeklyPlansError) {
+      console.error('Error fetching weekly plans:', weeklyPlansError);
+      return NextResponse.json(
+        { error: 'Failed to fetch weekly plans', details: weeklyPlansError.message },
+        { status: 500 }
+      );
+    }
+
+    // Get weekly plan recipes
+    const weeklyPlanId = weeklyPlans && weeklyPlans.length > 0 ? weeklyPlans[0].id : null;
 
     // Initialize the empty weekly plan structure
     const dayMap: WeeklyPlanMap = {
@@ -54,127 +93,87 @@ export async function GET(request: Request) {
       Sun: { breakfast: [], lunch: [], dinner: [] },
     };
 
-    // Check if this is a test user and use admin client if needed
-    let weeklyPlan, recipes;
-    
-    // Only use test user case if the user is actually the test user
-    // This ensures test user data isn't shown to regular users
-    // Strict check requires BOTH matching ID and email
-    if (user.id === '00000000-0000-0000-0000-000000000000' && 
-        user.email === 'test@ecochef.demo') {
-      console.log('Using admin client for test user weekly plan');
-      const { data: weeklyPlans, error: weeklyPlansError } = await getTestUserDataWithAdmin('weekly_plans');
-      
-      if (weeklyPlansError) {
-        console.error('GET /api/weekly-plan: Error fetching test user weekly plan:', weeklyPlansError);
-        return NextResponse.json(
-          { error: 'Failed to fetch weekly plan', details: weeklyPlansError },
-          { status: 500 }
-        );
-      }
-      
-      weeklyPlan = weeklyPlans && weeklyPlans.length > 0 ? weeklyPlans[0] : null;
-      
-      if (weeklyPlan) {
-        // Get recipes for the weekly plan using admin client
-        const adminClient = createAdminClient();
-        const { data: weeklyRecipes, error: recipesError } = await adminClient
-          .from('weekly_plan_recipes')
-          .select('*')
-          .eq('"weeklyPlanId"', weeklyPlan.id)
-          .order('"plannedDate"', { ascending: true });
-          
-        if (recipesError) {
-          console.error('Error fetching weekly plan recipes:', recipesError);
-        } else {
-          recipes = weeklyRecipes;
-        }
-      }
-    } else {
-      console.log('Using server client for regular user weekly plan');
-      // For regular users, create server client with our helper
-      const supabase = await createServerClient();
-      const { data: userWeeklyPlan, error } = await supabase
-        .from('weekly_plans')
-        .select('*')
-        .eq('userid', user.id)
-        .order('"weekStartDate"', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code === 'PGRST116') {
-        // This indicates no weekly plan was found, which is a valid state
-        return NextResponse.json({ 
-          weeklyPlan: {
-            id: null,
-            userid: user.id,
-            "weekStartDate": new Date().toISOString().split('T')[0],
-            ...dayMap
-          } 
-        });
-      }
-
-      if (error) {
-        console.error('GET /api/weekly-plan: Error fetching weekly plan:', error);
-        return NextResponse.json(
-          { error: 'Failed to fetch weekly plan', details: error.message },
-          { status: 500 }
-        );
-      }
-      
-      weeklyPlan = userWeeklyPlan;
-      
-      if (weeklyPlan && weeklyPlan.id) {
-        const { data: weeklyRecipes, error: recipesError } = await supabase
-          .from('weekly_plan_recipes')
-          .select('*')
-          .eq('"weeklyPlanId"', weeklyPlan.id)
-          .order('"plannedDate"', { ascending: true });
-
-        if (recipesError) {
-          console.error('Error fetching weekly plan recipes:', recipesError);
-        } else {
-          recipes = weeklyRecipes;
-        }
-      }
-    }
-
     // If no weekly plan was found
-    if (!weeklyPlan) {
+    if (!weeklyPlanId) {
       // Return an empty weekly plan structure
       return NextResponse.json({ 
         weeklyPlan: {
           id: null,
           userid: user.id,
-          "weekStartDate": new Date().toISOString().split('T')[0],
+          "weekStartDate": weekStartDate || new Date().toISOString().split('T')[0],
           ...dayMap
         } 
       });
     }
 
-    if (recipes && recipes.length > 0) {
-      const weekStart = new Date(weeklyPlan["weekStartDate"]);
+    // Check if this is a test user and use admin client if needed
+    let recipes: RecipeObject[] = [];
+    
+    // If we found a weekly plan, get its start date
+    const weekStart = weeklyPlans && weeklyPlans.length > 0 ? new Date(weeklyPlans[0].weekStartDate) : null;
+    
+    // Only use test user case if the user is actually the test user
+    if (user.id === '00000000-0000-0000-0000-000000000000' && 
+        user.email === 'test@ecochef.demo') {
+      console.log('Using admin client for test user weekly plan');
+      const { data: weeklyRecipes, error: recipesError } = await getTestUserDataWithAdmin('weekly_plan_recipes');
+      
+      if (recipesError) {
+        console.error('GET /api/weekly-plan: Error fetching test user weekly plan:', recipesError);
+        return NextResponse.json(
+          { error: 'Failed to fetch weekly plan', details: recipesError },
+          { status: 500 }
+        );
+      }
+      
+      if (weeklyRecipes && weeklyRecipes.length > 0) {
+        recipes = weeklyRecipes.filter((recipe: RecipeObject) => recipe.weeklyPlanId === weeklyPlanId);
+      }
+    } else {
+      console.log('Using server client for regular user weekly plan');
+      
+      // For regular users
+      const { data: weeklyRecipes, error: recipesError } = await supabase
+        .from('weekly_plan_recipes')
+        .select('*')
+        .eq('weeklyPlanId', weeklyPlanId)
+        .order('plannedDate', { ascending: true });
 
-      recipes.forEach((recipe) => {
-        if (!recipe["plannedDate"]) {
+      if (recipesError) {
+        console.error('Error fetching weekly plan recipes:', recipesError);
+        return NextResponse.json(
+          { error: 'Failed to fetch recipes', details: recipesError.message },
+          { status: 500 }
+        );
+      }
+      
+      recipes = weeklyRecipes || [];
+    }
+
+    if (recipes && recipes.length > 0) {
+      // Use weekStart if available, otherwise default to current date
+      const weekStartDate = weekStart || new Date();
+
+      recipes.forEach((recipe: RecipeObject) => {
+        if (!recipe.plannedDate) {
           console.warn('Recipe missing plannedDate:', recipe);
           return;
         }
 
         try {
-          const plannedDate = new Date(recipe["plannedDate"]);
+          const plannedDate = new Date(recipe.plannedDate);
           if (isNaN(plannedDate.getTime())) {
-            console.warn('Invalid planned date:', recipe["plannedDate"]);
+            console.warn('Invalid planned date:', recipe.plannedDate);
             return;
           }
 
-          if (isNaN(weekStart.getTime())) {
-            console.warn('Invalid week start date:', weeklyPlan["weekStartDate"]);
+          if (weekStart && isNaN(weekStart.getTime())) {
+            console.warn('Invalid week start date:', weeklyPlans && weeklyPlans[0]?.weekStartDate);
             return;
           }
 
           let dayDiff = Math.floor(
-            (plannedDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)
+            (plannedDate.getTime() - weekStartDate.getTime()) / (1000 * 60 * 60 * 24)
           );
 
           dayDiff = Math.max(0, Math.min(6, dayDiff));
@@ -183,20 +182,26 @@ export async function GET(request: Request) {
           const dayName: DayName = dayNames[dayDiff];
 
           const mealType = 
-            recipe["mealType"] && ['breakfast', 'lunch', 'dinner'].includes(recipe["mealType"].toLowerCase())
-              ? recipe["mealType"].toLowerCase() as MealType
+            recipe.mealType && ['breakfast', 'lunch', 'dinner'].includes(recipe.mealType.toLowerCase())
+              ? recipe.mealType.toLowerCase() as MealType
               : 'dinner' as MealType;
 
           // Ensure recipedata has the expected structure
           const normalizedRecipeData: RecipeData = {
-            ...(recipe["recipeData"] || {}),
-            name: recipe["recipeData"]?.name || 'Unnamed Recipe',
-            ingredients: Array.isArray(recipe["recipeData"]?.ingredients) 
-              ? recipe["recipeData"].ingredients 
+            ...(recipe.recipeData || {}),
+            name: recipe.recipeData?.name || 'Unnamed Recipe',
+            ingredients: Array.isArray(recipe.recipeData?.ingredients) 
+              ? recipe.recipeData.ingredients 
               : [],
-            instructions: Array.isArray(recipe["recipeData"]?.instructions) 
-              ? recipe["recipeData"].instructions 
-              : []
+            instructions: Array.isArray(recipe.recipeData?.instructions) 
+              ? recipe.recipeData.instructions 
+              : [],
+            servingSize: recipe.recipeData?.servingSize || 1,
+            calories: recipe.recipeData?.calories || null,
+            protein: recipe.recipeData?.protein || null,
+            carbs: recipe.recipeData?.carbs || null,
+            fat: recipe.recipeData?.fat || null,
+            nutritionInfo: recipe.recipeData?.nutritionInfo || {}
           };
 
           dayMap[dayName][mealType].push(normalizedRecipeData);
@@ -206,12 +211,17 @@ export async function GET(request: Request) {
       });
     }
 
+    // Ensure we have the correct weekStartDate value for the response
+    const responseWeekStartDate = weeklyPlans && weeklyPlans.length > 0
+      ? weeklyPlans[0].weekStartDate
+      : weekStartDate || new Date().toISOString().split('T')[0];
+
     // Return the weekly plan with proper structure
     return NextResponse.json({
       weeklyPlan: {
-        id: weeklyPlan.id,
-        userid: weeklyPlan.userid,
-        "weekStartDate": weeklyPlan["weekStartDate"],
+        id: weeklyPlanId,
+        userid: user.id,
+        "weekStartDate": responseWeekStartDate,
         ...dayMap,
       },
     });
@@ -240,6 +250,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Ensure weekStartDate is provided
+    if (!weeklyPlan.weekStartDate) {
+      console.error('Missing weekStartDate in weekly plan');
+      return NextResponse.json(
+        { error: 'weekStartDate is required' },
+        { status: 400 }
+      );
+    }
+
     const user = await getCurrentUser(request);
     console.log('POST /api/weekly-plan: User:', user);
 
@@ -250,153 +269,110 @@ export async function POST(request: Request) {
       );
     }
 
-    // Extract the weekStartDate from the weeklyPlan object or use current date
-    const weekStartDate = weeklyPlan.weekStartDate || new Date().toISOString().split('T')[0];
-    // Extract recipes, which might be directly in weeklyPlan or in a recipes property
-    const recipes = Array.isArray(weeklyPlan.recipes) ? weeklyPlan.recipes : [];
+    // Get recipes from the weekly plan (should be an array)
+    const recipes = weeklyPlan.recipes || [];
+    if (!Array.isArray(recipes)) {
+      console.error('Recipes must be an array');
+      return NextResponse.json(
+        { error: 'recipes must be an array' },
+        { status: 400 }
+      );
+    }
 
-    console.log(`Processing weekly plan with weekStartDate ${weekStartDate} and ${recipes.length} recipes`);
+    // Create server client 
+    const supabase = await createServerClient();
 
-    // Special handling for test user - only process as test user if the ID and email match the test user
-    // Strict check requires BOTH matching ID and email
-    if (user.id === '00000000-0000-0000-0000-000000000000' && 
-        user.email === 'test@ecochef.demo') {
-      try {
-        const adminClient = createAdminClient();
-        
-        // Delete any existing weekly plans for this user first to maintain just one plan
-        console.log('Deleting any existing test user weekly plans');
-        const { error: deleteOldPlansError } = await adminClient
-          .from('weekly_plans')
-          .delete()
-          .eq('userid', user.id);
-        
-        if (deleteOldPlansError) {
-          console.error('Error deleting old test user weekly plans:', deleteOldPlansError);
-        }
-        
-        // Create a new weekly plan
-        const { data: weeklyPlanData, error: planError } = await adminClient
-          .from('weekly_plans')
-          .insert({
-            userid: user.id,
-            "weekStartDate": weekStartDate,
-            "createdAt": new Date().toISOString(),
-            "updatedAt": new Date().toISOString()
-          })
-          .select()
-          .single();
-          
-        if (planError) {
-          console.error('Error saving test user weekly plan:', planError);
-          return NextResponse.json(
-            { error: 'Failed to save weekly plan', details: planError },
-            { status: 500 }
-          );
-        }
-        
-        // Process recipes for the test user weekly plan
-        if (weeklyPlanData?.id && recipes.length > 0) {
-          // Delete any existing recipes
-          const { error: deleteRecipesError } = await adminClient
-            .from('weekly_plan_recipes')
-            .delete()
-            .eq('"weeklyPlanId"', weeklyPlanData.id);
-            
-          if (deleteRecipesError) {
-            console.error('Error deleting existing test user weekly plan recipes:', deleteRecipesError);
-          }
-          
-          // Insert new recipes
-          const recipesToInsert = recipes.map((recipe: RecipeInput) => ({
-            "weeklyPlanId": weeklyPlanData.id,
-            "recipeData": recipe.recipeData || {},
-            "plannedDate": recipe.plannedDate || weekStartDate,
-            "mealType": recipe.mealType || 'dinner',
-            "createdAt": new Date().toISOString(),
-            "updatedAt": new Date().toISOString()
-          }));
-          
-          const { error: insertRecipesError } = await adminClient
-            .from('weekly_plan_recipes')
-            .insert(recipesToInsert);
-            
-          if (insertRecipesError) {
-            console.error('Error inserting test user weekly plan recipes:', insertRecipesError);
-          }
-        }
-        
-        return NextResponse.json({
-          success: true,
-          weeklyPlan: {
-            id: weeklyPlanData.id,
-            userid: weeklyPlanData.userid,
-            "weekStartDate": weeklyPlanData["weekStartDate"],
-          },
-        });
-      } catch (error) {
-        console.error('Error saving test user weekly plan:', error);
+    // First check if a weekly plan already exists for this week
+    const { data: existingPlans, error: queryError } = await supabase
+      .from('weekly_plans')
+      .select('id')
+      .eq('userid', user.id)
+      .eq('"weekStartDate"', weeklyPlan.weekStartDate);
+
+    if (queryError) {
+      console.error('Error checking existing weekly plans:', queryError);
+      return NextResponse.json(
+        { error: 'Failed to check existing weekly plans', details: queryError.message },
+        { status: 500 }
+      );
+    }
+
+    let weeklyPlanId: string;
+
+    // If plan exists, update it, otherwise create a new one
+    if (existingPlans && existingPlans.length > 0) {
+      weeklyPlanId = existingPlans[0].id;
+      console.log(`Updating existing weekly plan ${weeklyPlanId} for week starting ${weeklyPlan.weekStartDate}`);
+      
+      // Update the weekly plan
+      const { error: updateError } = await supabase
+        .from('weekly_plans')
+        .update({
+          "weekStartDate": weeklyPlan.weekStartDate,
+          "updatedAt": new Date().toISOString()
+        })
+        .eq('id', weeklyPlanId);
+
+      if (updateError) {
+        console.error('Error updating weekly plan:', updateError);
         return NextResponse.json(
-          { error: 'Failed to save test user weekly plan' },
+          { error: 'Failed to update weekly plan', details: updateError.message },
           { status: 500 }
         );
       }
-    }
-    
-    // Regular authenticated user case
-    console.log('Saving weekly plan for regular user:', user.id);
-    const supabase = await createServerClient();
-    
-    // Delete any existing weekly plans for this user first to maintain just one plan
-    console.log('Deleting any existing weekly plans for user:', user.id);
-    const { error: deleteOldPlansError } = await supabase
-      .from('weekly_plans')
-      .delete()
-      .eq('userid', user.id);
-    
-    if (deleteOldPlansError) {
-      console.error('Error deleting old weekly plans:', deleteOldPlansError);
-      return NextResponse.json(
-        { error: 'Failed to clear old weekly plans', details: deleteOldPlansError.message },
-        { status: 500 }
-      );
-    }
-    
-    // Create a new weekly plan
-    const { data: savedWeeklyPlan, error: upsertError } = await supabase
-      .from('weekly_plans')
-      .insert({
-        userid: user.id,
-        "weekStartDate": weekStartDate,
-        "createdAt": new Date().toISOString(),
-        "updatedAt": new Date().toISOString()
-      })
-      .select()
-      .single();
 
-    if (upsertError) {
-      console.error('Database error during weekly plan upsert:', upsertError);
-      return NextResponse.json(
-        { error: 'Failed to save weekly plan', details: upsertError.message },
-        { status: 500 }
-      );
-    }
+      // Delete existing recipes for this plan
+      const { error: deleteError } = await supabase
+        .from('weekly_plan_recipes')
+        .delete()
+        .eq('"weeklyPlanId"', weeklyPlanId);
 
-    if (!savedWeeklyPlan || !savedWeeklyPlan.id) {
-      console.error('Weekly plan was not created properly, missing ID');
-      return NextResponse.json(
-        { error: 'Failed to create weekly plan - no ID returned' },
-        { status: 500 }
-      );
+      if (deleteError) {
+        console.error('Error deleting existing recipes:', deleteError);
+        return NextResponse.json(
+          { error: 'Failed to update weekly plan recipes', details: deleteError.message },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Create a new weekly plan
+      console.log(`Creating new weekly plan for week starting ${weeklyPlan.weekStartDate}`);
+      const { data: newPlan, error: insertError } = await supabase
+        .from('weekly_plans')
+        .insert({
+          userid: user.id,
+          "weekStartDate": weeklyPlan.weekStartDate,
+          "createdAt": new Date().toISOString(),
+          "updatedAt": new Date().toISOString()
+        })
+        .select();
+
+      if (insertError) {
+        console.error('Error creating weekly plan:', insertError);
+        return NextResponse.json(
+          { error: 'Failed to create weekly plan', details: insertError.message },
+          { status: 500 }
+        );
+      }
+
+      if (!newPlan || newPlan.length === 0) {
+        console.error('No weekly plan created');
+        return NextResponse.json(
+          { error: 'Failed to create weekly plan - no data returned' },
+          { status: 500 }
+        );
+      }
+
+      weeklyPlanId = newPlan[0].id;
     }
 
     // Process the recipes from the request
-    if (savedWeeklyPlan?.id) {
+    if (weeklyPlanId) {
       // Delete existing recipes if any
       const { error: deleteError } = await supabase
         .from('weekly_plan_recipes')
         .delete()
-        .eq('"weeklyPlanId"', savedWeeklyPlan.id);
+        .eq('"weeklyPlanId"', weeklyPlanId);
 
       if (deleteError) {
         console.error('Error deleting existing weekly plan recipes:', deleteError);
@@ -411,9 +387,9 @@ export async function POST(request: Request) {
         // Define a type for recipe objects in the array
         
         const recipesToInsert = recipes.map((recipe: RecipeInput) => ({
-          "weeklyPlanId": savedWeeklyPlan.id,
+          "weeklyPlanId": weeklyPlanId,
           "recipeData": recipe.recipeData || {},
-          "plannedDate": recipe.plannedDate || weekStartDate,
+          "plannedDate": recipe.plannedDate || weeklyPlan.weekStartDate,
           "mealType": recipe.mealType || 'dinner',
           "createdAt": new Date().toISOString(),
           "updatedAt": new Date().toISOString()
@@ -436,9 +412,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       weeklyPlan: {
-        id: savedWeeklyPlan.id,
-        userid: savedWeeklyPlan.userid,
-        "weekStartDate": savedWeeklyPlan["weekStartDate"],
+        id: weeklyPlanId,
+        userid: user.id,
+        "weekStartDate": weeklyPlan.weekStartDate,
       },
     });
   } catch (error) {

@@ -81,8 +81,12 @@ CREATE TABLE weekly_plans (
   userid UUID REFERENCES "User"(id) ON DELETE CASCADE,
   "weekStartDate" DATE NOT NULL,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(userid, "weekStartDate")
 );
+
+-- Create index for faster date-based lookups
+CREATE INDEX idx_weekly_plans_week_start_date ON weekly_plans("weekStartDate");
 
 -- Create weekly_plan_recipes table
 CREATE TABLE weekly_plan_recipes (
@@ -119,6 +123,12 @@ CREATE TABLE custom_recipes (
   description TEXT,
   difficulty TEXT,
   time TEXT,
+  "servingSize" INTEGER DEFAULT 1,
+  "calories" INTEGER,
+  "protein" REAL,
+  "carbs" REAL,
+  "fat" REAL,
+  "nutritionInfo" JSONB DEFAULT '{}'::JSONB,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

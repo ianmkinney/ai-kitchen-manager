@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useDrag, useDrop } from 'react-dnd';
-import { format, startOfWeek, addDays } from 'date-fns';
+import { format } from 'date-fns';
 
 // Define types for drag-and-drop
 const ItemType = {
@@ -42,6 +42,12 @@ interface Recipe {
   name: string;
   ingredients: string[];
   instructions: string[];
+  servingSize?: number;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  nutritionInfo?: Record<string, number | string>;
 }
 
 // Define a meal type enumeration
@@ -75,7 +81,11 @@ function DraggableRecipe({ recipe }: { recipe: Recipe }) {
   }));
 
   const handleClick = () => {
-    alert(`Title: ${recipe.name}\n\nIngredients:\n${recipe.ingredients.join(', ')}\n\nInstructions:\n${recipe.instructions.join('\n')}`);
+    const nutritionInfo = recipe.calories 
+      ? `\n\nNutrition (per serving):\nCalories: ${recipe.calories} kcal\nProtein: ${recipe.protein || 0}g\nCarbs: ${recipe.carbs || 0}g\nFat: ${recipe.fat || 0}g`
+      : '';
+      
+    alert(`Title: ${recipe.name}\n\nServings: ${recipe.servingSize || 1}\n\nIngredients:\n${recipe.ingredients.join(', ')}\n\nInstructions:\n${recipe.instructions.join('\n')}${nutritionInfo}`);
   };
 
   return (
@@ -85,7 +95,19 @@ function DraggableRecipe({ recipe }: { recipe: Recipe }) {
       style={{ cursor: 'move' }}
       onClick={handleClick}
     >
-      <h3 className="font-medium text-sm">{recipe.name}</h3>
+      <div>
+        <h3 className="font-medium text-xs sm:text-sm truncate" title={recipe.name}>{recipe.name}</h3>
+        {recipe.calories && (
+          <div className="flex items-center mt-1 text-xs text-gray-500">
+            <span className="mr-2">{recipe.calories} kcal</span>
+            <div className="flex space-x-1">
+              <span title="Protein">{recipe.protein || 0}p</span>
+              <span title="Carbs">{recipe.carbs || 0}c</span>
+              <span title="Fat">{recipe.fat || 0}f</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -112,36 +134,52 @@ function DroppableMealTime({
   }));
 
   const handleClick = (recipe: Recipe) => {
-    alert(`Title: ${recipe.name}\n\nIngredients:\n${recipe.ingredients.join(', ')}\n\nInstructions:\n${recipe.instructions.join('\n')}`);
+    const nutritionInfo = recipe.calories 
+      ? `\n\nNutrition (per serving):\nCalories: ${recipe.calories} kcal\nProtein: ${recipe.protein || 0}g\nCarbs: ${recipe.carbs || 0}g\nFat: ${recipe.fat || 0}g`
+      : '';
+      
+    alert(`Title: ${recipe.name}\n\nServings: ${recipe.servingSize || 1}\n\nIngredients:\n${recipe.ingredients.join(', ')}\n\nInstructions:\n${recipe.instructions.join('\n')}${nutritionInfo}`);
   };
 
   return (
     <div
       ref={drop as unknown as React.RefObject<HTMLDivElement>}
-      className={`p-3 bg-gray-50 rounded-lg ${isOver ? 'bg-green-100' : ''}`}
+      className={`p-2 sm:p-3 bg-gray-50 rounded-lg ${isOver ? 'bg-green-100' : ''}`}
     >
-      <h4 className="font-medium text-xs mb-2 capitalize">{mealTime}</h4>
+      <h4 className="font-medium text-xs mb-1 sm:mb-2 capitalize">{mealTime}</h4>
       {meals.map((meal, index) => (
         <div
           key={index}
-          className="text-xs text-gray-800 mb-1 flex justify-between items-center"
+          className="text-xs text-gray-800 mb-1"
         >
-          <span 
-            className="cursor-pointer hover:text-blue-600"
-            onClick={() => handleClick(meal)}
-          >
-            {meal.name}
-          </span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(day, mealTime, index);
-            }}
-            className="text-red-500 hover:text-red-700 ml-2 text-xs"
-            title="Remove meal"
-          >
-            ✕
-          </button>
+          <div className="flex justify-between items-center">
+            <span 
+              className="cursor-pointer hover:text-blue-600 truncate max-w-[80%]"
+              onClick={() => handleClick(meal)}
+            >
+              {meal.name}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(day, mealTime, index);
+              }}
+              className="text-red-500 hover:text-red-700 ml-1 text-xs shrink-0"
+              title="Remove meal"
+              aria-label="Remove meal"
+            >
+              ✕
+            </button>
+          </div>
+          {meal.calories && (
+            <div className="text-[10px] text-gray-500 flex items-center mt-0.5">
+              <span className="mr-1">{meal.calories} kcal</span>
+              <span className="text-gray-400">|</span>
+              <span className="mx-1" title="Protein">{meal.protein || 0}p</span>
+              <span className="mx-1" title="Carbs">{meal.carbs || 0}c</span>
+              <span className="mx-1" title="Fat">{meal.fat || 0}f</span>
+            </div>
+          )}
         </div>
       ))}
       {meals.length === 0 && (
@@ -160,7 +198,7 @@ function DroppableDay({ day, onDrop, onRemove, dailyMeals, date }: {
 }) {
   return (
     <div className="flex flex-col space-y-2">
-      <h3 className="font-medium text-center mb-1">
+      <h3 className="font-medium text-center text-sm sm:text-base mb-1">
         {day} {date && <span className="text-xs text-gray-500">({date})</span>}
       </h3>
       <DroppableMealTime 
@@ -233,10 +271,61 @@ export default function MealPlanning() {
   // State for storing the dates of the current week
   const [weekDates, setWeekDates] = useState<Record<string, string>>({});
   
+  // Add state for week selection
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState<number>(0);
+  const [availableWeeks, setAvailableWeeks] = useState<{offset: number, startDate: string, endDate: string}[]>([]);
+  
+  // Calculate current week's start and end dates
+  const calculateWeekDates = (weekOffset = 0) => {
+    const currentDate = new Date();
+    const currentWeekStart = new Date(currentDate);
+    // Set to previous Monday
+    currentWeekStart.setDate(currentDate.getDate() - (currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1));
+    // Add the week offset (0 for current week, -1 for previous week, 1 for next week)
+    currentWeekStart.setDate(currentWeekStart.getDate() + (weekOffset * 7));
+    
+    const dates: Record<string, string> = {};
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((day, index) => {
+      const date = new Date(currentWeekStart);
+      date.setDate(currentWeekStart.getDate() + index);
+      dates[day] = format(date, 'MMM d');
+    });
+    
+    return {
+      dates,
+      weekStartDate: format(currentWeekStart, 'yyyy-MM-dd')
+    };
+  };
+  
+  // Generate 3 weeks before and after the current week for selection
+  useEffect(() => {
+    const weeks = [];
+    for (let i = -3; i <= 3; i++) {
+      const { dates } = calculateWeekDates(i);
+      weeks.push({
+        offset: i,
+        startDate: dates['Mon'],
+        endDate: dates['Sun']
+      });
+    }
+    setAvailableWeeks(weeks);
+  }, []);
+  
   // Load saved preferences, weekly plan and pantry items on component mount
   useEffect(() => {
     // Create a flag to track if component is mounted
     let isMounted = true;
+    
+    // Reset the weekly plan to clear old data before loading new week
+    setWeeklyPlan({
+      Mon: { breakfast: [], lunch: [], dinner: [] },
+      Tue: { breakfast: [], lunch: [], dinner: [] },
+      Wed: { breakfast: [], lunch: [], dinner: [] },
+      Thu: { breakfast: [], lunch: [], dinner: [] },
+      Fri: { breakfast: [], lunch: [], dinner: [] },
+      Sat: { breakfast: [], lunch: [], dinner: [] },
+      Sun: { breakfast: [], lunch: [], dinner: [] },
+    });
     
     const fetchAllData = async () => {
       // Set loading state
@@ -246,44 +335,29 @@ export default function MealPlanning() {
         // Run all data fetching in parallel
         await Promise.all([
           fetchPreferences(),
-          fetchWeeklyPlan(),
+          fetchWeeklyPlan(selectedWeekOffset),
           fetchPantryItems()
         ]);
       } catch (error) {
-        console.error('Error loading initial data:', error);
+        console.error('Error fetching data:', error);
       } finally {
-        // Clear loading state
+        // Only update state if component is still mounted
         if (isMounted) setIsLoading(false);
       }
     };
     
     fetchAllData();
     
-    // Cleanup function to prevent state updates after unmount
+    // Update week dates when selected week changes
+    const { dates } = calculateWeekDates(selectedWeekOffset);
+    setWeekDates(dates);
+    
+    // Cleanup function to set the flag when component unmounts
     return () => {
       isMounted = false;
     };
-  }, []);
-  
-  // Calculate the dates for the current week
-  useEffect(() => {
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Start from Monday
-    
-    const dates: Record<string, string> = {};
-    const dayMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    for (let i = 0; i < 7; i++) {
-      const date = addDays(weekStart, i);
-      const dayName = dayMap[date.getDay()];
-      dates[dayName] = format(date, 'MMM d');
-    }
-    
-    setWeekDates(dates);
-    console.log("Week dates calculated:", dates);
-    
-    // No need for a reference to weekDates here, as it's used elsewhere
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeekOffset]);
   
   const fetchPreferences = async () => {
     try {
@@ -360,19 +434,25 @@ export default function MealPlanning() {
     }
   };
 
-  const fetchWeeklyPlan = async () => {
+  const fetchWeeklyPlan = async (weekOffset = 0) => {
     try {
-      console.log('Fetching weekly plan...');
+      console.log(`Fetching weekly plan for offset: ${weekOffset}...`);
       setIsLoadingPlan(true);
-      const response = await fetch('/api/weekly-plan');
+      
+      // Calculate the week start date based on the offset
+      const { weekStartDate } = calculateWeekDates(weekOffset);
+      console.log(`Fetching weekly plan with startDate: ${weekStartDate}`);
+      
+      const response = await fetch(`/api/weekly-plan?weekStartDate=${weekStartDate}`);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Weekly plan API response:', data);
+        console.log(`Weekly plan API response for ${weekStartDate}:`, data);
         
         if (data.weeklyPlan) {
           // Ensure the weekly plan has the expected structure with meal times
           const plan = data.weeklyPlan;
+          console.log(`Plan received with weekStartDate ${plan.weekStartDate} and ID ${plan.id}`);
           
           // Create a new blank weekly plan to start with
           const newPlan: WeeklyPlan = {
@@ -398,7 +478,13 @@ export default function MealPlanning() {
                     return {
                       name: recipe.name || 'Unnamed Recipe',
                       ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
-                      instructions: Array.isArray(recipe.instructions) ? recipe.instructions : []
+                      instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+                      servingSize: recipe.servingSize,
+                      calories: recipe.calories,
+                      protein: recipe.protein,
+                      carbs: recipe.carbs,
+                      fat: recipe.fat,
+                      nutritionInfo: recipe.nutritionInfo
                     };
                   });
                 }
@@ -462,6 +548,12 @@ export default function MealPlanning() {
           name: recipe.name,
           ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
           instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+          servingSize: recipe.servingSize,
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat,
+          nutritionInfo: recipe.nutritionInfo,
           isCustom: true
         }));
         
@@ -605,8 +697,17 @@ Please create recipes that specifically address this query.
 IMPORTANT: Create recipes that prioritize using ingredients from the user's pantry. The available pantry ingredients are: ${pantryItems.join(', ')}
 
 Please respond with only JSON containing an array of recipes that match the user's query. 
-Each recipe should include "name", "ingredients", and "instructions" fields. 
-In the ingredients list, mark items with an asterisk (*) if they are found in the user's pantry.
+Each recipe should include the following fields:
+- "name": A descriptive name for the recipe
+- "ingredients": An array of ingredients required (mark pantry items with an asterisk *)
+- "instructions": An array of step-by-step cooking instructions
+- "servingSize": Number of servings the recipe makes
+- "calories": Estimated calories per serving
+- "protein": Estimated protein in grams per serving
+- "carbs": Estimated carbohydrates in grams per serving
+- "fat": Estimated fat in grams per serving
+
+IMPORTANT: You must include accurate nutritional information for each recipe.
 No extra text or formatting.`,
           preferences: preferences,
           pantryItems: pantryItems
@@ -701,7 +802,18 @@ No extra text or formatting.`,
               "4. Place the chicken on a separate baking sheet or on top of the vegetables.",
               "5. Bake for 25-30 minutes, or until the chicken is cooked through and the vegetables are tender.",
               "6. Serve the chicken and roasted vegetables with lemon slices."
-            ]
+            ],
+            "servingSize": 4,
+            "calories": 350,
+            "protein": 30,
+            "carbs": 10,
+            "fat": 20,
+            "nutritionInfo": {
+              "calories": 350,
+              "protein": 30,
+              "carbs": 10,
+              "fat": 20
+            }
           },
           {
             "name": "Grilled Salmon with Mango Salsa",
@@ -722,7 +834,18 @@ No extra text or formatting.`,
               "3. Grill the salmon for 4-6 minutes per side, or until cooked through.",
               "4. In a small bowl, combine the mango, red onion, jalapeño, cilantro, and lime juice. Mix well.",
               "5. Serve the grilled salmon with the mango salsa."
-            ]
+            ],
+            "servingSize": 4,
+            "calories": 250,
+            "protein": 20,
+            "carbs": 0,
+            "fat": 15,
+            "nutritionInfo": {
+              "calories": 250,
+              "protein": 20,
+              "carbs": 0,
+              "fat": 15
+            }
           },
           {
             "name": "Beef and Broccoli Stir-Fry",
@@ -747,7 +870,18 @@ No extra text or formatting.`,
               "5. Add the broccoli florets and beef broth. Cover and cook for 3-4 minutes, until the broccoli is tender-crisp.",
               "6. Stir in the brown sugar and sesame oil. Season with salt and pepper to taste.",
               "7. Serve the beef and broccoli stir-fry over steamed rice."
-            ]
+            ],
+            "servingSize": 4,
+            "calories": 300,
+            "protein": 20,
+            "carbs": 20,
+            "fat": 15,
+            "nutritionInfo": {
+              "calories": 300,
+              "protein": 20,
+              "carbs": 20,
+              "fat": 15
+            }
           }
         ];
         setAiResponse({ meals: directData, otherContent: [] });
@@ -802,11 +936,9 @@ No extra text or formatting.`,
     try {
       const recipesList = [];
       
-      // Get the start of the current week (Monday)
-      const currentDate = new Date();
-      const currentWeekStart = new Date(currentDate);
-      // Set to previous Monday
-      currentWeekStart.setDate(currentDate.getDate() - (currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1));
+      // Get the week start date based on the selected offset
+      const { weekStartDate } = calculateWeekDates(selectedWeekOffset);
+      console.log(`Saving weekly plan for offset: ${selectedWeekOffset} with start date: ${weekStartDate}`);
       
       // Flatten the weekly plan data into a list of recipes with their day and meal time
       for (const [day, meals] of Object.entries(weeklyPlan)) {
@@ -814,7 +946,7 @@ No extra text or formatting.`,
           for (const recipe of recipeList) {
             // Create a date string for this meal based on the day
             const dayIndex = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(day);
-            const weekDate = new Date(currentWeekStart);
+            const weekDate = new Date(weekStartDate);
             weekDate.setDate(weekDate.getDate() + dayIndex);
             const plannedDate = weekDate.toISOString().split('T')[0];
             
@@ -827,6 +959,8 @@ No extra text or formatting.`,
         }
       }
       
+      console.log(`Sending ${recipesList.length} recipes to save for week starting ${weekStartDate}`);
+      
       // Send data to the API
       const response = await fetch('/api/weekly-plan', {
         method: 'POST',
@@ -835,7 +969,7 @@ No extra text or formatting.`,
         },
         body: JSON.stringify({
           weeklyPlan: {
-            weekStartDate: currentWeekStart.toISOString().split('T')[0],
+            weekStartDate,
             recipes: recipesList,
           },
         }),
@@ -847,11 +981,11 @@ No extra text or formatting.`,
       }
       
       const data = await response.json();
-      console.log('Weekly plan saved successfully:', data);
+      console.log(`Weekly plan for week ${weekStartDate} saved successfully:`, data);
       alert('Weekly plan saved successfully!');
       
       // Refresh the weekly plan data
-      fetchWeeklyPlan();
+      fetchWeeklyPlan(selectedWeekOffset);
     } catch (error) {
       console.error('Error saving weekly plan:', error);
       alert(`Error saving weekly plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -863,9 +997,12 @@ No extra text or formatting.`,
     setIsGeneratingList(true);
     
     try {
-      // Call the API endpoint to generate the shopping list with a cache-busting timestamp
+      // Calculate the week start date based on the selected offset
+      const { weekStartDate } = calculateWeekDates(selectedWeekOffset);
+      
+      // Call the API endpoint to generate the shopping list with a cache-busting timestamp and week start date
       const timestamp = new Date().getTime();
-      const response = await fetch(`/api/shopping/weekly-list?t=${timestamp}`, {
+      const response = await fetch(`/api/shopping/weekly-list?t=${timestamp}&weekStartDate=${weekStartDate}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -930,22 +1067,22 @@ No extra text or formatting.`,
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Meal Planning</h1>
-          <Link href="/" className="btn-secondary">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2 sm:mb-0">Meal Planning</h1>
+          <Link href="/" className="btn-secondary text-sm sm:text-base">
             Back to Home
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
           {/* Left Column - Preferences Section */}
-          <div className="flex flex-col space-y-8">
+          <div className="flex flex-col space-y-4 sm:space-y-8">
             {/* AI Suggestion Section - Reduced height */}
-            <section className="card h-96 overflow-y-auto">
-              <h2 className="text-xl font-semibold mb-4">AI Meal Suggestions</h2>
+            <section className="card h-72 sm:h-96 overflow-y-auto">
+              <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">AI Meal Suggestions</h2>
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <input
                     type="text"
                     placeholder="Ask for meal suggestions..."
@@ -983,7 +1120,7 @@ No extra text or formatting.`,
                 {customRecipes.length > 0 && (
                   <div className="mt-4">
                     <h3 className="text-md font-medium mb-2">Your Custom Recipes</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {customRecipes.map((recipe, index) => (
                         <DraggableRecipe key={`custom-${index}`} recipe={recipe} />
                       ))}
@@ -1009,7 +1146,7 @@ No extra text or formatting.`,
                 {Array.isArray(aiResponse.meals) && aiResponse.meals.length > 0 && (
                   <div>
                     <h3 className="text-md font-medium mb-2">AI Generated Recipes</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {aiResponse.meals.map((recipe, index) => (
                         <DraggableRecipe key={`ai-${index}`} recipe={recipe} />
                       ))}
@@ -1027,11 +1164,11 @@ No extra text or formatting.`,
               </div>
             </section>
             <section className="card">
-              <h2 className="text-xl font-semibold mb-4">Your Preferences</h2>
+              <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Your Preferences</h2>
               <form className="space-y-4" onSubmit={savePreferences}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Dietary Restrictions */}
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-sm font-medium mb-1">
                       Dietary Restrictions
                     </label>
@@ -1233,58 +1370,115 @@ No extra text or formatting.`,
           </div>
 
           {/* Right Column - AI Suggestions and Weekly Plan */}
-          <div className="flex flex-col space-y-8">
+          <div className="flex flex-col space-y-4 sm:space-y-8">
             
-            {/* Weekly Plan Section with two rows layout - now positioned below AI Suggestions */}
+            {/* Weekly Plan Section with week selector */}
             <section className="card">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div>
-                  <h2 className="text-xl font-semibold">Your Weekly Plan</h2>
+                  <h2 className="text-lg sm:text-xl font-semibold">Your Weekly Plan</h2>
                   {weekDates['Mon'] && weekDates['Sun'] && (
                     <p className="text-xs text-gray-500">Week of {weekDates['Mon']} - {weekDates['Sun']}</p>
                   )}
                 </div>
+                
+                {/* Week Selector */}
+                <div className="flex items-center mt-2 sm:mt-0">
+                  <button 
+                    onClick={() => setSelectedWeekOffset(prev => prev - 1)}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-700"
+                    aria-label="Previous week"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  
+                  <select 
+                    className="text-sm mx-2 p-1 border rounded"
+                    value={selectedWeekOffset}
+                    onChange={(e) => setSelectedWeekOffset(Number(e.target.value))}
+                  >
+                    {availableWeeks.map((week, index) => (
+                      <option key={index} value={week.offset}>
+                        {week.startDate} - {week.endDate} {week.offset === 0 ? '(Current)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <button 
+                    onClick={() => setSelectedWeekOffset(prev => prev + 1)}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-700"
+                    aria-label="Next week"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+                
                 {isLoadingPlan && (
-                  <span className="text-sm text-blue-500">Loading your saved plan...</span>
+                  <span className="text-sm text-blue-500 mt-2 sm:mt-0">Loading your saved plan...</span>
                 )}
-                {/* Using weekDates to display dates for days: {Object.keys(weekDates).length} days configured */}
               </div>
               
-              {/* First row: Monday-Thursday */}
-              <div className="mb-4">
-                <h3 className="text-sm font-medium mb-2 text-gray-500">Monday - Thursday</h3>
-                <div className="grid grid-cols-4 gap-2">
-                  {['Mon', 'Tue', 'Wed', 'Thu'].map((day) => (
-                    <DroppableDay
-                      key={day}
-                      day={day}
-                      dailyMeals={weeklyPlan[day]}
-                      onDrop={handleDrop}
-                      onRemove={removeMeal}
-                      date={weekDates[day]}
-                    />
+              {/* Mobile-optimized plan layout */}
+              <div className="block sm:hidden">
+                {/* Mobile view: One day at a time, scrollable horizontally */}
+                <div className="flex overflow-x-auto pb-4 space-x-4">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                    <div key={day} className="flex-shrink-0 w-[85vw]">
+                      <DroppableDay
+                        day={day}
+                        dailyMeals={weeklyPlan[day]}
+                        onDrop={handleDrop}
+                        onRemove={removeMeal}
+                        date={weekDates[day]}
+                      />
+                    </div>
                   ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Swipe left/right to see all days</p>
+              </div>
+              
+              {/* Desktop view: Split into two rows */}
+              <div className="hidden sm:block">
+                {/* First row: Monday-Thursday */}
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium mb-2 text-gray-500">Monday - Thursday</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {['Mon', 'Tue', 'Wed', 'Thu'].map((day) => (
+                      <DroppableDay
+                        key={day}
+                        day={day}
+                        dailyMeals={weeklyPlan[day]}
+                        onDrop={handleDrop}
+                        onRemove={removeMeal}
+                        date={weekDates[day]}
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Second row: Friday-Sunday */}
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium mb-2 text-gray-500">Friday - Sunday</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Fri', 'Sat', 'Sun'].map((day) => (
+                      <DroppableDay
+                        key={day}
+                        day={day}
+                        dailyMeals={weeklyPlan[day]}
+                        onDrop={handleDrop}
+                        onRemove={removeMeal}
+                        date={weekDates[day]}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
               
-              {/* Second row: Friday-Sunday */}
-              <div className="mb-4">
-                <h3 className="text-sm font-medium mb-2 text-gray-500">Friday - Sunday</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Fri', 'Sat', 'Sun'].map((day) => (
-                    <DroppableDay
-                      key={day}
-                      day={day}
-                      dailyMeals={weeklyPlan[day]}
-                      onDrop={handleDrop}
-                      onRemove={removeMeal}
-                      date={weekDates[day]}
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex mt-4 space-x-4">
+              <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 mt-4">
                 <button
                   className="btn-primary"
                   onClick={saveWeeklyPlan}
@@ -1305,8 +1499,8 @@ No extra text or formatting.`,
         
         {/* Shopping List Modal */}
         {showShoppingList && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] sm:max-h-[80vh] overflow-y-auto">
               <h2 className="text-xl font-semibold mb-4">Shopping List</h2>
               
               {shoppingList.length === 0 ? (
@@ -1336,15 +1530,15 @@ No extra text or formatting.`,
                     ))}
                   </div>
                   
-                  <div className="flex justify-end space-x-2">
+                  <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-2">
                     <button 
-                      className="btn-secondary"
+                      className="btn-secondary w-full sm:w-auto"
                       onClick={() => setShowShoppingList(false)}
                     >
                       Close
                     </button>
                     <button 
-                      className="btn-primary"
+                      className="btn-primary w-full sm:w-auto"
                       onClick={addToShoppingList}
                     >
                       Add to Pantry Shopping List

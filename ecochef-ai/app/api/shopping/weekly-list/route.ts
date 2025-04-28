@@ -72,25 +72,37 @@ function isIngredientInPantry(ingredient: string, pantryItems: string[]): boolea
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // Get the current user
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get the week start date from query parameters
+    const url = new URL(request.url);
+    const weekStartDate = url.searchParams.get('weekStartDate');
+    
+    console.log('Generating shopping list for week starting:', weekStartDate);
+
     // Create server client
     const supabase = await createServerClient();
 
-    // 1. Get the user's weekly plan with cache busting option
-    const { data: weeklyPlans, error: weeklyPlanError } = await supabase
+    // 1. Get the user's weekly plan with optional filtering by weekStartDate
+    let query = supabase
       .from('weekly_plans')
       .select('*')
       .eq('userid', user.id)
-      .order('"weekStartDate"', { ascending: false })
-      .limit(1);
+      .order('"weekStartDate"', { ascending: false });
+    
+    // Filter by weekStartDate if provided
+    if (weekStartDate) {
+      query = query.eq('"weekStartDate"', weekStartDate);
+    }
+    
+    const { data: weeklyPlans, error: weeklyPlanError } = await query.limit(1);
 
     if (weeklyPlanError) {
       console.error('Error fetching weekly plan:', weeklyPlanError);
@@ -104,7 +116,7 @@ export async function GET() {
     if (!weeklyPlans || weeklyPlans.length === 0) {
       return NextResponse.json({
         shoppingList: [],
-        message: 'No weekly plan found'
+        message: 'No weekly plan found for the specified week'
       });
     }
 

@@ -104,10 +104,16 @@ export async function POST(request: Request) {
       
       ${pantryItemsText}
       
-      Respond with a JSON array containing 3-5 recipe objects. Each recipe should include:
+      Respond with a JSON array containing 3-5 recipe objects. Each recipe MUST include:
       - "name": Recipe title
       - "ingredients": Array of ingredients with measurements
       - "instructions": Array of step-by-step instructions
+      - "servingSize": Number of servings the recipe makes (integer)
+      - "calories": Estimated calories per serving (integer)
+      - "protein": Estimated protein in grams per serving (decimal)
+      - "carbs": Estimated carbohydrates in grams per serving (decimal)
+      - "fat": Estimated fat in grams per serving (decimal)
+      - "nutritionInfo": JSON object with additional nutrition details
       
       Make sure the recipes DIRECTLY ADDRESS the user's specific query!
       Use ingredients they already have in their pantry when possible.
@@ -124,12 +130,22 @@ export async function POST(request: Request) {
       1. Always provide varied and unique recipe suggestions that directly address the user's query
       2. Prioritize using ingredients from the user's pantry when possible
       3. Format your response as a valid JSON array of recipe objects
-      4. Each recipe object must have "name", "ingredients", and "instructions" fields
-      5. Ensure dietary restrictions are strictly followed
-      6. Be creative and avoid repetitive suggestions even for similar queries
-      7. Focus on practical, easy-to-follow recipes
-      8. Include specific measurements in ingredients
-      9. Your response should ONLY contain the JSON array, no additional text or commentary
+      4. Each recipe object MUST have ALL of these fields:
+        - "name" (string): Recipe title 
+        - "ingredients" (array): List of ingredients with measurements
+        - "instructions" (array): Step-by-step cooking instructions
+        - "servingSize" (integer): Number of servings the recipe makes
+        - "calories" (integer): Estimated calories per serving
+        - "protein" (number): Estimated protein in grams per serving
+        - "carbs" (number): Estimated carbohydrates in grams per serving
+        - "fat" (number): Estimated fat in grams per serving
+        - "nutritionInfo" (object): Additional nutrition details
+      5. NEVER omit nutritional information - it's required for the database
+      6. Ensure dietary restrictions are strictly followed
+      7. Be creative and avoid repetitive suggestions even for similar queries
+      8. Focus on practical, easy-to-follow recipes
+      9. Include specific measurements in ingredients
+      10. Your response should ONLY contain the JSON array, no additional text or commentary
       
       The final output must be a valid JSON array that can be parsed by JSON.parse().
     `;
