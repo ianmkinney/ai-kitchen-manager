@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     // Get the current user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     
     if (!user) {
       return NextResponse.json(

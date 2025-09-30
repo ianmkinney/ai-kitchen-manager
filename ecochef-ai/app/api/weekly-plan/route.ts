@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   const weekStartDate = url.searchParams.get('weekStartDate');
   
   try {
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: 'You must be logged in to access this resource' },
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     console.log('POST /api/weekly-plan: User:', user);
 
     if (!user) {

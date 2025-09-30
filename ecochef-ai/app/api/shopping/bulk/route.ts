@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     }
     
     // Get the current authenticated user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     
     // If no user is authenticated, return 401 Unauthorized
     if (!user || !user.email) {

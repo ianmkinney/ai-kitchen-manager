@@ -244,8 +244,28 @@ export async function POST(request: Request) {
           .join('\n');
       }
 
+      // Define recipe interface for type safety
+      interface Recipe {
+        name: string;
+        ingredients: string[];
+        instructions: string[];
+        prepTime?: string;
+        cookTime?: string;
+        servings?: number;
+        difficulty?: string;
+        cuisine?: string;
+        tags?: string[];
+        description?: string;
+        nutrition?: {
+          calories: number;
+          protein: number;
+          carbs: number;
+          fat: number;
+        };
+      }
+
       // Robust JSON parsing with multiple fallback strategies
-      const parseAIResponse = (text: string): any[] => {
+      const parseAIResponse = (text: string): Recipe[] => {
         console.log('Raw AI response length:', text.length);
         
         // Strategy 1: Direct JSON parsing
@@ -254,7 +274,7 @@ export async function POST(request: Request) {
           if (Array.isArray(directParse)) return directParse;
           if (directParse && typeof directParse === 'object') return [directParse];
         } catch (e) {
-          console.log('Direct parsing failed:', e.message);
+          console.log('Direct parsing failed:', e instanceof Error ? e.message : String(e));
         }
         
         // Strategy 2: Clean and parse (remove markdown, code blocks, etc.)
@@ -271,7 +291,7 @@ export async function POST(request: Request) {
           if (Array.isArray(cleanedParse)) return cleanedParse;
           if (cleanedParse && typeof cleanedParse === 'object') return [cleanedParse];
         } catch (e) {
-          console.log('Cleaned parsing failed:', e.message);
+          console.log('Cleaned parsing failed:', e instanceof Error ? e.message : String(e));
         }
         
         // Strategy 3: Extract JSON using regex patterns
@@ -289,7 +309,7 @@ export async function POST(request: Request) {
                 const parsed = JSON.parse(match);
                 if (Array.isArray(parsed)) return parsed;
                 if (parsed && typeof parsed === 'object') return [parsed];
-              } catch (e) {
+              } catch {
                 console.log('Regex parsing failed for match length:', match.length);
               }
             }
@@ -323,7 +343,7 @@ export async function POST(request: Request) {
           if (Array.isArray(parsed)) return parsed;
           if (parsed && typeof parsed === 'object') return [parsed];
         } catch (e) {
-          console.log('Fixed parsing failed:', e.message);
+          console.log('Fixed parsing failed:', e instanceof Error ? e.message : String(e));
         }
         
         // Strategy 5: Aggressive truncation and reconstruction
@@ -340,7 +360,7 @@ export async function POST(request: Request) {
             if (Array.isArray(parsed)) return parsed;
           }
         } catch (e) {
-          console.log('Truncation parsing failed:', e.message);
+          console.log('Truncation parsing failed:', e instanceof Error ? e.message : String(e));
         }
         
         return [];

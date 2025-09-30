@@ -21,10 +21,10 @@ export async function createServerClient(): Promise<ExtendedSupabaseClient> {
           get(name: string) {
             return cookieStore.get(name)?.value;
           },
-          set(name: string, value: string, options: any) {
+          set(name: string, value: string, options: Record<string, unknown>) {
             cookieStore.set({ name, value, ...options });
           },
-          remove(name: string, options: any) {
+          remove(name: string, options: Record<string, unknown>) {
             cookieStore.set({ name, value: '', ...options });
           },
         },
@@ -41,7 +41,7 @@ export async function createServerClient(): Promise<ExtendedSupabaseClient> {
  * Gets the current authenticated user from Supabase auth
  * Returns null if no user is authenticated
  */
-export async function getCurrentUser(request?: Request) {
+export async function getCurrentUser() {
   try {
     const supabase = await createServerClient();
     const { data: { user }, error } = await supabase.auth.getUser();

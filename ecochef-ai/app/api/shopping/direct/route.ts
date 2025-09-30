@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     }
     
     // Get the current authenticated user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     
     // If no user is authenticated, return 401 Unauthorized
     if (!user) {
@@ -64,10 +64,10 @@ export async function POST(request: Request) {
 }
 
 // GET - Retrieve all shopping list items for the current user
-export async function GET(request: Request) {
+export async function GET() {
   try {
     // Get the current authenticated user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     
     // If no user is authenticated, return 401 Unauthorized
     if (!user) {

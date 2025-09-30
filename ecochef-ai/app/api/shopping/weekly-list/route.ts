@@ -75,7 +75,7 @@ function isIngredientInPantry(ingredient: string, pantryItems: string[]): boolea
 export async function GET(request: Request) {
   try {
     // Get the current user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

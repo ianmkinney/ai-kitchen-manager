@@ -3,9 +3,9 @@ import { createServerClient, getCurrentUser } from '../../lib/supabase-server';
 import { getTestUserDataWithAdmin, insertTestUserDataWithAdmin } from '../../lib/admin-check';
 
 // GET - Retrieve all pantry items for the current user
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     console.log('GET /api/pantry: User:', user);
 
     // If no user is authenticated, return 401 Unauthorized
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     // Get the current authenticated user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     console.log('POST /api/pantry: User:', user);
 
     // If no user is authenticated, return 401 Unauthorized
@@ -154,7 +154,7 @@ export async function PUT(request: Request) {
     }
 
     // Get the current authenticated user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
 
     // If no user is authenticated, return 401 Unauthorized
     if (!user) {
@@ -230,7 +230,7 @@ export async function DELETE(request: Request) {
     }
 
     // Get the current authenticated user
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
 
     // If no user is authenticated, return 401 Unauthorized
     if (!user) {

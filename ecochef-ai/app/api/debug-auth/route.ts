@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     };
     
     // Get current user via the same method used by API routes
-    const currentUser = await getCurrentUser(req);
+    const currentUser = await getCurrentUser();
     authInfo.currentUser = currentUser;
     
     // Check pantry access
