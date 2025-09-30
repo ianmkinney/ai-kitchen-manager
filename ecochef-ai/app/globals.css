@@ -14,21 +14,76 @@
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 p-6 
+    @apply bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 p-4 sm:p-6 
            border border-primary-100;
   }
 
+  /* Responsive button styles with constrained sizing */
   .btn-primary {
-    @apply px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors;
+    @apply px-3 py-2 sm:px-4 bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors
+           text-sm sm:text-base font-medium min-w-0 flex-shrink-0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-gray-800 transition-colors;
+    @apply px-3 py-2 sm:px-4 bg-gray-200 hover:bg-gray-300 rounded text-gray-800 transition-colors
+           text-sm sm:text-base font-medium min-w-0 flex-shrink-0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Small button variant for compact spaces */
+  .btn-sm {
+    @apply px-2 py-1 text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 rounded text-gray-700 
+           transition-colors font-medium min-w-0 flex-shrink-0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .input-field {
-    @apply w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 
-           focus:ring-primary-500 focus:border-transparent outline-none;
+    @apply w-full px-3 py-2 sm:px-4 rounded-lg border border-gray-200 focus:ring-2 
+           focus:ring-primary-500 focus:border-transparent outline-none text-sm sm:text-base;
+    min-width: 0;
+  }
+
+  /* Container constraints */
+  .container-constrained {
+    @apply w-full max-w-full overflow-hidden;
+  }
+
+  /* Flex utilities for responsive layouts */
+  .flex-responsive {
+    @apply flex flex-wrap gap-2 sm:gap-3;
+  }
+
+  .flex-responsive-nowrap {
+    @apply flex gap-1 sm:gap-2 overflow-x-auto;
+  }
+
+  /* Text truncation utilities */
+  .text-truncate {
+    @apply truncate min-w-0;
+  }
+
+  /* Responsive grid for buttons */
+  .btn-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3;
+  }
+
+  /* Mobile-first responsive spacing */
+  .space-responsive {
+    @apply space-y-2 sm:space-y-3;
+  }
+
+  .space-x-responsive {
+    @apply space-x-1 sm:space-x-2 lg:space-x-3;
   }
 }
 

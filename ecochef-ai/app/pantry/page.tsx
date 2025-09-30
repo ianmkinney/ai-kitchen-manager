@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import AiDisclaimer from '../components/AiDisclaimer';
 // Import required Supabase functions
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClientComponentClient } from '../lib/supabase';
 
 // Define pantry item interface
 interface PantryItem {
@@ -784,10 +784,10 @@ export default function Pantry() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Pantry Management</h1>
-        <Link href="/" className="btn-secondary">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-truncate">Pantry Management</h1>
+        <Link href="/" className="btn-secondary w-full sm:w-auto">
           Back to Home
         </Link>
       </div>
@@ -824,17 +824,17 @@ export default function Pantry() {
               </button>
             )}
           </div>
-          <div className="flex gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
             <input
               type="text"
               placeholder="Add new item..."
-              className="input-field flex-1"
+              className="input-field flex-1 min-w-0"
               value={newPantryItem}
               onChange={(e) => setNewPantryItem(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addPantryItem()}
             />
             <button 
-              className="btn-primary whitespace-nowrap"
+              className="btn-primary w-full sm:w-auto"
               onClick={addPantryItem}
               disabled={!!error?.includes('not initialized') || !!error?.includes('schema mismatch')}
             >
@@ -845,13 +845,13 @@ export default function Pantry() {
           {isLoading ? (
             <div className="p-8 text-center">Loading pantry items...</div>
           ) : pantryItems.length > 0 ? (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <ul className="space-y-2">
               {pantryItems.map((item) => (
-                <li key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                  <span>{item.itemName}</span>
+                <li key={item.id} className="flex justify-between items-center bg-gray-50 p-2 sm:p-3 rounded-lg">
+                  <span className="text-truncate flex-1 min-w-0 pr-2">{item.itemName}</span>
                   <button 
                     onClick={() => removePantryItem(item.itemName)}
-                    className="text-red-500 hover:text-red-700"
+                    className="btn-sm text-red-600 hover:text-red-800 flex-shrink-0"
                   >
                     Remove
                   </button>
@@ -871,15 +871,15 @@ export default function Pantry() {
           
           {/* Tab navigation */}
           <div className="border-b mb-4">
-            <div className="flex space-x-4">
+            <div className="flex space-x-2 sm:space-x-4 overflow-x-auto">
               <button 
-                className={`pb-2 ${activeTab === 'regular' ? 'border-b-2 border-blue-600 font-medium' : 'text-gray-500'}`}
+                className={`pb-2 whitespace-nowrap text-sm sm:text-base ${activeTab === 'regular' ? 'border-b-2 border-blue-600 font-medium' : 'text-gray-500'}`}
                 onClick={() => setActiveTab('regular')}
               >
                 Regular List
               </button>
               <button 
-                className={`pb-2 ${activeTab === 'weeklyPlan' ? 'border-b-2 border-blue-600 font-medium' : 'text-gray-500'}`}
+                className={`pb-2 whitespace-nowrap text-sm sm:text-base ${activeTab === 'weeklyPlan' ? 'border-b-2 border-blue-600 font-medium' : 'text-gray-500'}`}
                 onClick={() => setActiveTab('weeklyPlan')}
               >
                 Weekly Plan List
@@ -891,13 +891,13 @@ export default function Pantry() {
           {activeTab === 'regular' && (
             <>
               {!showBulkEdit && (
-                <div className="flex items-center space-x-2 mb-6">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-6">
                   <input
                     type="text"
                     value={newShoppingItem}
                     onChange={(e) => setNewShoppingItem(e.target.value)}
                     placeholder="Add new shopping item..."
-                    className="flex-grow border p-2 rounded"
+                    className="input-field flex-1 min-w-0"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') addShoppingItem();
                     }}
@@ -905,7 +905,7 @@ export default function Pantry() {
                   <select 
                     value={newItemCategory}
                     onChange={(e) => setNewItemCategory(e.target.value)}
-                    className="border p-2 rounded"
+                    className="input-field w-full sm:w-auto min-w-0"
                   >
                     <option value="General">General</option>
                     <option value="Produce">Produce</option>
@@ -917,7 +917,7 @@ export default function Pantry() {
                     <option value="Other">Other</option>
                   </select>
                   <button 
-                    className="btn-primary whitespace-nowrap"
+                    className="btn-primary w-full sm:w-auto"
                     onClick={addShoppingItem}
                   >
                     Add
@@ -926,31 +926,31 @@ export default function Pantry() {
               )}
               
               {!showBulkEdit && (
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex space-x-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button 
-                      className="text-blue-600 hover:text-blue-800 text-sm"
+                      className="btn-sm text-blue-600 hover:text-blue-800"
                       onClick={prepareBulkEditText}
                     >
                       Bulk Edit
                     </button>
                     <button 
-                      className="text-red-600 hover:text-red-800 text-sm"
+                      className="btn-sm text-red-600 hover:text-red-800"
                       onClick={clearCheckedItems}
                       disabled={!shoppingList.some(item => item.isChecked)}
                     >
                       Clear Checked
                     </button>
                   </div>
-                  <div className="flex space-x-4">
+                  <div className="flex flex-wrap gap-2">
                     <button 
-                      className="text-blue-600 hover:text-blue-800 text-sm"
+                      className="btn-sm text-blue-600 hover:text-blue-800"
                       onClick={() => copyToClipboard('regular')}
                     >
                       Copy List
                     </button>
                     <button 
-                      className="text-green-600 hover:text-green-800 text-sm"
+                      className="btn-sm text-green-600 hover:text-green-800"
                       onClick={() => exportAsTxt('regular')}
                     >
                       Export
@@ -966,24 +966,24 @@ export default function Pantry() {
           {/* Weekly Plan Shopping List Tab */}
           {activeTab === 'weeklyPlan' && (
             <>
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
                 <button 
-                  className={`btn-primary ${isLoadingWeeklyList ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`btn-primary w-full sm:w-auto ${isLoadingWeeklyList ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={fetchWeeklyPlanShoppingList}
                   disabled={isLoadingWeeklyList}
                 >
                   {isLoadingWeeklyList ? 'Refreshing...' : 'Refresh List'}
                 </button>
                 {weeklyPlanShoppingList.length > 0 && (
-                  <div className="flex space-x-4">
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <button 
-                      className="text-blue-600 hover:text-blue-800 text-sm"
+                      className="btn-sm text-blue-600 hover:text-blue-800"
                       onClick={() => copyToClipboard('weeklyPlan')}
                     >
                       Copy List
                     </button>
                     <button 
-                      className="text-green-600 hover:text-green-800 text-sm"
+                      className="btn-sm text-green-600 hover:text-green-800"
                       onClick={() => exportAsTxt('weeklyPlan')}
                     >
                       Export

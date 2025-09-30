@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '../lib/supabase';
+import { createClientComponentClient } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { useRouter } from 'next/navigation';
 
 // Replace the direct supabase instance with a browser client
-const supabase = createBrowserClient();
+const supabase = createClientComponentClient();
 
 export default function Header() {
   const [hasPreferences, setHasPreferences] = useState(false);
