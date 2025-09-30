@@ -49,6 +49,11 @@ interface Recipe {
   carbs?: number;
   fat?: number;
   nutritionInfo?: Record<string, number | string>;
+  cuisine?: string;
+  difficulty?: string;
+  prepTime?: string;
+  cookTime?: string;
+  servings?: number;
 }
 
 // Define a meal type enumeration
@@ -72,7 +77,7 @@ interface ShoppingItem {
   category?: string;
 }
 
-function DraggableRecipe({ recipe }: { recipe: Recipe }) {
+function DraggableRecipe({ recipe, onSaveRecipe }: { recipe: Recipe; onSaveRecipe?: (recipe: Recipe) => void }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemType.RECIPE,
     item: { recipe },
@@ -89,6 +94,13 @@ function DraggableRecipe({ recipe }: { recipe: Recipe }) {
     alert(`Title: ${recipe.name}\n\nServings: ${recipe.servingSize || 1}\n\nIngredients:\n${recipe.ingredients.join(', ')}\n\nInstructions:\n${recipe.instructions.join('\n')}${nutritionInfo}`);
   };
 
+  const handleSaveRecipe = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSaveRecipe) {
+      onSaveRecipe(recipe);
+    }
+  };
+
   return (
     <div
       ref={drag as unknown as React.RefObject<HTMLDivElement>}
@@ -97,7 +109,18 @@ function DraggableRecipe({ recipe }: { recipe: Recipe }) {
       onClick={handleClick}
     >
       <div>
-        <h3 className="font-medium text-xs sm:text-sm truncate" title={recipe.name}>{recipe.name}</h3>
+        <div className="flex justify-between items-start mb-1">
+          <h3 className="font-medium text-xs sm:text-sm truncate flex-1" title={recipe.name}>{recipe.name}</h3>
+          {onSaveRecipe && (
+            <button
+              onClick={handleSaveRecipe}
+              className="text-green-600 hover:text-green-800 text-xs ml-2 flex-shrink-0"
+              title="Save as custom recipe"
+            >
+              Save
+            </button>
+          )}
+        </div>
         {recipe.calories && (
           <div className="flex items-center mt-1 text-xs text-gray-500">
             <span className="mr-2">{recipe.calories} kcal</span>
@@ -1035,6 +1058,47 @@ No extra text or formatting.`,
     }
   };
 
+  // Save AI-generated recipe as custom recipe
+  const saveRecipeAsCustom = async (recipe: Recipe) => {
+    try {
+      const response = await fetch('/api/custom-recipes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: recipe.name,
+          ingredients: recipe.ingredients,
+          instructions: recipe.instructions,
+          description: `${recipe.name} - AI Generated Recipe`,
+          cuisine: recipe.cuisine || 'International',
+          difficulty: recipe.difficulty || 'Easy',
+          time: recipe.prepTime || '30 minutes',
+          prepTime: recipe.prepTime || '10 minutes',
+          cookTime: recipe.cookTime || '20 minutes',
+          servings: recipe.servings || recipe.servingSize || 2,
+          calories: recipe.calories || 0,
+          protein: recipe.protein || 0,
+          carbs: recipe.carbs || 0,
+          fat: recipe.fat || 0
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save recipe');
+      }
+      
+      alert(`Recipe "${recipe.name}" saved to your custom recipes!`);
+      
+      // Refresh custom recipes to show the newly saved one
+      fetchCustomRecipes();
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      alert('Failed to save recipe. Please try again.');
+    }
+  };
+
   // Add items to shopping list in pantry
   const addToShoppingList = async () => {
     if (shoppingList.length === 0) return;
@@ -1151,7 +1215,7 @@ No extra text or formatting.`,
                   <h3 className="text-md font-medium mb-2">AI Generated Recipes</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {aiResponse.meals.map((recipe, index) => (
-                      <DraggableRecipe key={`ai-${index}`} recipe={recipe} />
+                      <DraggableRecipe key={`ai-${index}`} recipe={recipe} onSaveRecipe={saveRecipeAsCustom} />
                     ))}
                   </div>
                 </div>

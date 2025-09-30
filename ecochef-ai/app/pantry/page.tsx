@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import AiDisclaimer from '../components/AiDisclaimer';
-// Import required Supabase functions
-import { createClientComponentClient } from '../lib/supabase';
 
 // Define pantry item interface
 interface PantryItem {
@@ -15,32 +13,7 @@ interface PantryItem {
   updatedAt: string;
 }
 
-// Function to create a Supabase client
-const createSupabaseClient = () => {
-  return createClientComponentClient();
-};
 
-// Function to get the current user ID from cookies
-const getCurrentUserFromCookies = () => {
-  // Get user ID from cookies (ecochef_user_id)
-  const cookies = document.cookie.split(';');
-  const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('ecochef_user_id='));
-  const userId = userIdCookie ? userIdCookie.split('=')[1] : null;
-  
-  // Also check for test user
-  const testUserCookie = cookies.find(cookie => cookie.trim().startsWith('ecochef_test_user='));
-  const testUserIdCookie = cookies.find(cookie => cookie.trim().startsWith('ecochef_test_user_id='));
-  const testUserId = testUserIdCookie ? testUserIdCookie.split('=')[1] : null;
-  
-  // Return the appropriate user ID
-  if (userId) {
-    return userId;
-  } else if (testUserCookie && testUserId === '00000000-0000-0000-0000-000000000000') {
-    return '00000000-0000-0000-0000-000000000000';
-  }
-  
-  return null;
-};
 
 // Define shopping suggestion interfaces
 interface ShoppingItemSuggestion {
@@ -258,30 +231,23 @@ export default function Pantry() {
     if (!newShoppingItem.trim()) return;
     
     try {
-      // Use Supabase client directly
-      const supabase = createSupabaseClient();
-      
-      // Get the current user ID from cookies
-      const userId = getCurrentUserFromCookies();
-      
-      if (!userId) {
-        throw new Error('You must be logged in to add items to your shopping list');
-      }
-      
-      // Add the item
-      const { error } = await supabase
-        .from('ShoppingListItem')
-        .insert({
+      // Use API endpoint instead of direct Supabase calls
+      const response = await fetch('/api/shopping/direct', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: newShoppingItem.trim(),
           category: newItemCategory,
           quantity: 1,
-          unit: 'item',
-          isChecked: false,
-          userId: userId
-        });
+          unit: 'item'
+        })
+      });
       
-      if (error) {
-        throw new Error(error.message || 'Failed to add item');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add item');
       }
       
       console.log('Added shopping item successfully');
@@ -326,24 +292,18 @@ export default function Pantry() {
   // Remove item from shopping list
   const removeShoppingItem = async (id: string) => {
     try {
-      // Use the direct API endpoint with Supabase
-      const supabase = createSupabaseClient();
+      // Use API endpoint instead of direct Supabase calls
+      const response = await fetch('/api/shopping/direct', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id })
+      });
       
-      // Get the current user ID from cookies
-      const userId = getCurrentUserFromCookies();
-      
-      if (!userId) {
-        throw new Error('You must be logged in to remove items from your shopping list');
-      }
-      
-      const { error } = await supabase
-        .from('ShoppingListItem')
-        .delete()
-        .eq('id', id)
-        .eq('userId', userId); // Make sure we only delete the user's own items
-      
-      if (error) {
-        throw new Error(error.message || 'Failed to remove item');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove item');
       }
       
       // Update the local state without fetching again
@@ -357,24 +317,21 @@ export default function Pantry() {
   // Toggle checked status of shopping list item
   const toggleShoppingItemChecked = async (id: string, isCurrentlyChecked: boolean) => {
     try {
-      // Use the direct API endpoint with Supabase
-      const supabase = createSupabaseClient();
+      // Use API endpoint instead of direct Supabase calls
+      const response = await fetch('/api/shopping/direct', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          id, 
+          isChecked: !isCurrentlyChecked 
+        })
+      });
       
-      // Get the current user ID from cookies
-      const userId = getCurrentUserFromCookies();
-      
-      if (!userId) {
-        throw new Error('You must be logged in to update your shopping list');
-      }
-      
-      const { error } = await supabase
-        .from('ShoppingListItem')
-        .update({ isChecked: !isCurrentlyChecked })
-        .eq('id', id)
-        .eq('userId', userId); // Make sure we only update the user's own items
-      
-      if (error) {
-        throw new Error(error.message || 'Failed to update item');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update item');
       }
       
       // Update the local state without fetching again
@@ -418,6 +375,37 @@ export default function Pantry() {
     }
   };
 
+  // Save recipe as custom recipe
+  const saveRecipeAsCustom = async (recipe: RecipeIdea) => {
+    try {
+      const response = await fetch('/api/custom-recipes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: recipe.name,
+          ingredients: recipe.ingredients,
+          instructions: [recipe.description], // Convert description to instructions array
+          description: recipe.description,
+          cuisine: 'International',
+          difficulty: 'Easy',
+          time: '30 minutes'
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save recipe');
+      }
+      
+      alert(`Recipe "${recipe.name}" saved to your custom recipes!`);
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      alert('Failed to save recipe. Please try again.');
+    }
+  };
+
   // Clear all pantry items
   const clearAllPantryItems = async () => {
     if (!confirm("Are you sure you want to remove ALL items from your pantry?")) {
@@ -452,25 +440,20 @@ export default function Pantry() {
     }
     
     try {
-      // Use the direct API endpoint with Supabase
-      const supabase = createSupabaseClient();
+      // Use API endpoint instead of direct Supabase calls
+      const response = await fetch('/api/shopping/direct', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          ids: checkedItems.map(item => item.id) 
+        })
+      });
       
-      // Get the current user ID from cookies
-      const userId = getCurrentUserFromCookies();
-      
-      if (!userId) {
-        throw new Error('You must be logged in to update your shopping list');
-      }
-      
-      // Delete all checked items in one query
-      const { error } = await supabase
-        .from('ShoppingListItem')
-        .delete()
-        .in('id', checkedItems.map(item => item.id))
-        .eq('userId', userId); // Make sure we only delete the user's own items
-      
-      if (error) {
-        throw new Error(error.message || 'Failed to remove checked items');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove checked items');
       }
       
       // Update the local state to remove all checked items
@@ -486,35 +469,6 @@ export default function Pantry() {
     try {
       // Parse the text into items
       const lines = bulkEditText.split('\n').filter(line => line.trim());
-      
-      // Get Supabase client
-      const supabase = createSupabaseClient();
-      
-      // Get the current user ID from cookies
-      const userId = getCurrentUserFromCookies();
-      
-      if (!userId) {
-        throw new Error('You must be logged in to edit your shopping list');
-      }
-      
-      // First delete all existing items
-      const { error: deleteError } = await supabase
-        .from('ShoppingListItem')
-        .delete()
-        .in('id', shoppingList.map(item => item.id))
-        .eq('userId', userId); // Make sure we only delete the user's own items
-      
-      if (deleteError) {
-        throw new Error(`Error deleting existing items: ${deleteError.message}`);
-      }
-      
-      if (lines.length === 0) {
-        // If no new items, just end here
-        setShowBulkEdit(false);
-        // Update local state
-        setShoppingList([]);
-        return;
-      }
       
       // Prepare new items
       const newItems = lines.map(line => {
@@ -533,24 +487,28 @@ export default function Pantry() {
           name,
           category,
           quantity: 1,
-          unit: 'item',
-          isChecked: false,
-          userId: userId
+          unit: 'item'
         };
       });
       
-      // Insert all new items
-      const { data: insertedItems, error: insertError } = await supabase
-        .from('ShoppingListItem')
-        .insert(newItems)
-        .select();
+      // Use the bulk API endpoint
+      const response = await fetch('/api/shopping/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: newItems })
+      });
       
-      if (insertError) {
-        throw new Error(`Error adding new items: ${insertError.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save shopping list');
       }
       
+      const data = await response.json();
+      
       // Update local state with the new items
-      setShoppingList(insertedItems || []);
+      setShoppingList(data.shoppingItems || []);
       setShowBulkEdit(false);
     } catch (error) {
       console.error('Error saving bulk edited list:', error);
@@ -1099,29 +1057,23 @@ export default function Pantry() {
                                     className="text-blue-600 hover:text-blue-800 text-xs"
                                     onClick={async () => {
                                       try {
-                                        const supabase = createSupabaseClient();
-                                        
-                                        // Get the current user ID from cookies
-                                        const userId = getCurrentUserFromCookies();
-                                        
-                                        if (!userId) {
-                                          throw new Error('You must be logged in to add items to your shopping list');
-                                        }
-                                        
-                                        // Add the suggested item to the shopping list
-                                        const { error } = await supabase
-                                          .from('ShoppingListItem')
-                                          .insert({
+                                        // Use the API endpoint instead of direct Supabase calls
+                                        const response = await fetch('/api/shopping/direct', {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                          },
+                                          body: JSON.stringify({
                                             name: item.name,
                                             category: item.category,
                                             quantity: 1,
-                                            unit: 'item',
-                                            isChecked: false,
-                                            userId: userId // Use user ID from cookies
-                                          });
-                                          
-                                        if (error) {
-                                          throw new Error(error.message);
+                                            unit: 'item'
+                                          })
+                                        });
+                                        
+                                        if (!response.ok) {
+                                          const errorData = await response.json();
+                                          throw new Error(errorData.error || 'Failed to add item to shopping list');
                                         }
                                         
                                         // Update UI state to show the item was added
@@ -1156,7 +1108,16 @@ export default function Pantry() {
                     <div className="space-y-3">
                       {aiSuggestions.recipeIdeas.map((recipe, index) => (
                         <div key={index} className="bg-white p-3 rounded-lg shadow-sm">
-                          <h4 className="font-medium text-base">{recipe.name}</h4>
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium text-base">{recipe.name}</h4>
+                            <button
+                              onClick={() => saveRecipeAsCustom(recipe)}
+                              className="btn-sm text-green-600 hover:text-green-800"
+                              title="Save as custom recipe"
+                            >
+                              Save Recipe
+                            </button>
+                          </div>
                           <p className="text-xs text-gray-600 mt-1">{recipe.description}</p>
                           <div className="mt-2">
                             <span className="text-xs font-medium">Ingredients: </span>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCurrentUser } from '../../lib/supabase-server';
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../../lib/env';
 
@@ -12,38 +13,6 @@ const generateRecipeJSON = (recipes: { name: string; ingredients: string[]; inst
   return JSON.stringify(recipes, null, 2);
 };
 
-// Get user ID from request headers or use test user ID
-function getUserFromHeaders(request: Request) {
-  // Check headers for user ID and email
-  const userId = request.headers.get('x-user-id');
-  const userEmail = request.headers.get('x-user-email');
-  
-  // If headers are present, use them
-  if (userId && userEmail) {
-    return {
-      id: userId,
-      email: userEmail,
-      role: 'authenticated'
-    };
-  }
-  
-  // Check for test user cookie
-  const cookies = request.headers.get('cookie') || '';
-  const hasTestUserCookie = cookies.includes('test_user=') || 
-                            cookies.includes('ecochef_test_user=');
-  
-  // If test user cookie is present, return test user
-  if (hasTestUserCookie) {
-    return {
-      id: '00000000-0000-0000-0000-000000000000',
-      email: 'test@ecochef.demo',
-      role: 'authenticated'
-    };
-  }
-  
-  // No user found
-  return null;
-}
 
 export async function POST(request: Request) {
   try {
@@ -52,8 +21,8 @@ export async function POST(request: Request) {
     const preferences = body.preferences || {};
     const pantryItems = body.pantryItems || [];
     
-    // Get user from request headers or cookies
-    const user = getUserFromHeaders(request);
+    // Get current user using Supabase Auth
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
