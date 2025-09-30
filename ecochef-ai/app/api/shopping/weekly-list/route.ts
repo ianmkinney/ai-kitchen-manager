@@ -158,7 +158,7 @@ export async function GET(request: Request) {
     console.log(`Found ${pantryItemNames.length} pantry items for user`);
 
     // 4. Extract all ingredients from recipes
-    const allIngredients: string[] = [];
+    const allIngredients: Array<{original: string, cleaned: string}> = [];
     const mealTypeStats = {
       breakfast: 0,
       lunch: 0,
@@ -178,11 +178,15 @@ export async function GET(request: Request) {
         
         if (recipe.recipeData && recipe.recipeData.ingredients && Array.isArray(recipe.recipeData.ingredients)) {
           recipe.recipeData.ingredients.forEach((ingredient: string) => {
+            const originalIngredient = ingredient.trim();
             const cleanedIngredient = cleanIngredient(ingredient);
             
-            // Only add if it's not empty and not already in the list
-            if (cleanedIngredient && !allIngredients.includes(cleanedIngredient)) {
-              allIngredients.push(cleanedIngredient);
+            // Only add if it's not empty and not already in the list (check by cleaned ingredient)
+            if (cleanedIngredient && !allIngredients.some(item => item.cleaned === cleanedIngredient)) {
+              allIngredients.push({
+                original: originalIngredient,
+                cleaned: cleanedIngredient
+              });
             }
           });
         }
@@ -193,16 +197,16 @@ export async function GET(request: Request) {
     console.log(`Found ${allIngredients.length} unique ingredients across all recipes`);
 
     // 5. Filter out ingredients that are already in the pantry using the improved helper function
-    const missingIngredients = allIngredients.filter(ingredient => 
-      !isIngredientInPantry(ingredient, pantryItemNames)
+    const missingIngredients = allIngredients.filter(ingredientObj => 
+      !isIngredientInPantry(ingredientObj.cleaned, pantryItemNames)
     );
 
     console.log(`Found ${missingIngredients.length} ingredients missing from pantry`);
 
-    // 6. Prepare shopping list
-    const shoppingList = missingIngredients.map(item => ({
-      name: item.trim(),
-      category: categorizeIngredient(item.trim())
+    // 6. Prepare shopping list - use original names for display, cleaned names for categorization
+    const shoppingList = missingIngredients.map(ingredientObj => ({
+      name: ingredientObj.original,
+      category: categorizeIngredient(ingredientObj.cleaned)
     }));
 
     // 7. Return the shopping list with cache control headers

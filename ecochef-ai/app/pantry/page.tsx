@@ -141,38 +141,36 @@ export default function Pantry() {
     }
   };
 
-  // Fetch shopping list items from Supabase directly
+  // Fetch shopping list items from API route
   const fetchShoppingList = async () => {
     setIsLoadingShoppingList(true);
     setError(null);
     try {
-      // Use Supabase client directly
-      const supabase = createSupabaseClient();
-      
-      // Get the current user ID from cookies
-      const userId = getCurrentUserFromCookies();
-      
-      if (!userId) {
-        throw new Error('You must be logged in to view your shopping list');
+      // Use API route instead of direct Supabase call
+      const response = await fetch('/api/shopping/direct', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        // If no shopping list exists (404 or empty), just set empty array instead of error
+        if (response.status === 404 || response.status === 401) {
+          setShoppingList([]);
+          return;
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch shopping list');
       }
-      
-      // Fetch items
-      const { data, error } = await supabase
-        .from('ShoppingListItem')
-        .select('*')
-        .eq('userId', userId)
-        .order('isChecked', { ascending: true })
-        .order('category', { ascending: true });
-      
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch shopping list');
-      }
-      
+
+      const data = await response.json();
       console.log('Fetched shopping list:', data);
-      setShoppingList(data || []);
+      setShoppingList(data.shoppingItems || []);
     } catch (error) {
       console.error('Error fetching shopping list:', error);
-      setError('There was an error loading your shopping list. Please try again later.');
+      // Don't show error for missing shopping list, just set empty array
+      setShoppingList([]);
     } finally {
       setIsLoadingShoppingList(false);
     }
@@ -865,7 +863,24 @@ export default function Pantry() {
           )}
         </section>
 
-        {/* Shopping List Section */}
+        {/* Show Shopping List Button - Only show if shopping list is hidden */}
+        {shoppingList.length === 0 && weeklyPlanShoppingList.length === 0 && activeTab !== 'regular' && activeTab !== 'weeklyPlan' && (
+          <section className="card md:col-span-1">
+            <h2 className="text-xl font-semibold mb-4">Shopping List</h2>
+            <div className="text-center py-8">
+              <p className="text-gray-600 mb-4">No shopping list items yet.</p>
+              <button 
+                className="btn-primary"
+                onClick={() => setActiveTab('regular')}
+              >
+                Start Shopping List
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Shopping List Section - Only show if there are items or user wants to add items */}
+        {(shoppingList.length > 0 || weeklyPlanShoppingList.length > 0 || activeTab === 'regular' || activeTab === 'weeklyPlan') && (
         <section className="card md:col-span-1">
           <h2 className="text-xl font-semibold mb-4">Shopping List</h2>
           
@@ -1024,9 +1039,9 @@ export default function Pantry() {
                                 type="checkbox"
                                 checked={item.isChecked}
                                 onChange={() => toggleWeeklyItemChecked(item.id, item.isChecked)}
-                                className="mr-2"
+                                className="mr-2 flex-shrink-0"
                               />
-                              <span className={`flex-grow ${item.isChecked ? 'line-through text-gray-400' : ''}`}>
+                              <span className={`text-truncate flex-1 min-w-0 ${item.isChecked ? 'line-through text-gray-400' : ''}`}>
                                 {item.name}
                               </span>
                             </li>
@@ -1045,6 +1060,7 @@ export default function Pantry() {
             </>
           )}
         </section>
+        )}
 
         {/* AI Shopping Assistant */}
         <section className="card">
